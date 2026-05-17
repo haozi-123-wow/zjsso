@@ -1,5 +1,8 @@
 # OIDC 单点登录系统 - API 接口文档
 
+> **实现状态:** ✅ OIDC 3.0 标准端点已全部实现（/oauth/authorize, /oauth/token, /userinfo, /.well-known/openid-configuration, /.well-known/jwks.json）
+> 支持三种 grant_type: `authorization_code`（含PKCE）、`refresh_token`（轮换机制）、`client_credentials`
+
 ## 基础地址
 
 ```
@@ -72,13 +75,13 @@ GET /.well-known/jwks.json
 
 系统内置三种角色，权限层级依次递增：
 
-| 角色 | 层级 | 说明 | 权限 |
-|------|------|------|------|
-| `user` | 1 | 普通用户 | 登录、管理个人资料 |
-| `developer` | 2 | 开发者 | 包含 user 权限 + 注册和管理 **自己创建** 的 OIDC 客户端（无法查看或操作其他开发者的客户端） |
-| `admin` | 3 | 管理员 | 包含 developer 权限 + 管理所有用户和客户端、系统配置 |
+| 角色          | 层级 | 说明   | 权限                                                       |
+| ----------- | -- | ---- | -------------------------------------------------------- |
+| `user`      | 1  | 普通用户 | 登录、管理个人资料                                                |
+| `developer` | 2  | 开发者  | 包含 user 权限 + 注册和管理 **自己创建** 的 OIDC 客户端（无法查看或操作其他开发者的客户端） |
+| `admin`     | 3  | 管理员  | 包含 developer 权限 + 管理所有用户和客户端、系统配置                        |
 
-> 新注册用户默认为 `user` 角色，管理员可在用户管理界面调整角色。JWT 的 access_token 中携带 `role` 字段用于接口鉴权。`developer` 角色在客户端管理上受 `created_by` 数据隔离约束。详见 [客户端注册与管理](#5-客户端注册与管理)。
+> 新注册用户默认为 `user` 角色，管理员可在用户管理界面调整角色。JWT 的 access\_token 中携带 `role` 字段用于接口鉴权。`developer` 角色在客户端管理上受 `created_by` 数据隔离约束。详见 [客户端注册与管理](#5-客户端注册与管理)。
 
 ### 2.1 用户注册
 
@@ -521,6 +524,7 @@ Authorization: Bearer {access_token}
 ```
 
 **处理说明:**
+
 - 创建时后端自动将当前登录用户的 ID 记录到 `created_by` 字段
 - `developer` 角色创建后只能自己管理该客户端
 - `admin` 角色创建后可以管理该客户端，也可授权给其他用户
@@ -553,6 +557,7 @@ Authorization: Bearer {access_token}
 ```
 
 **处理说明:**
+
 - `developer` 角色仅返回自己创建的客户端列表（`WHERE created_by = 'user_id'`）
 - `admin` 角色返回所有客户端列表
 
@@ -587,6 +592,7 @@ Authorization: Bearer {access_token}
 ```
 
 **处理说明:**
+
 - `developer` 角色只能查看自己创建的客户端详情
 - `admin` 角色可以查看任意客户端详情
 
@@ -601,6 +607,7 @@ Authorization: Bearer {access_token}
 ```
 
 **处理说明:**
+
 - `developer` 角色只能更新自己创建的客户端
 - `admin` 角色可以更新任意客户端
 
@@ -616,6 +623,7 @@ Authorization: Bearer {access_token}
 ```
 
 **处理说明:**
+
 - `developer` 角色只能删除自己创建的客户端
 - `admin` 角色可以删除任意客户端
 
@@ -950,6 +958,9 @@ Content-Type: application/json
 
 ## 9. 第三方登录
 
+> **实现状态:** ✅ GitHub + QQ 第三方登录已完成
+> 环境变量配置：`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`、`QQ_APP_ID`、`QQ_APP_KEY`
+
 ### 9.1 获取第三方登录提供商列表
 
 返回已配置的第三方登录提供商列表。
@@ -1069,6 +1080,11 @@ Authorization: Bearer {access_token}
 ***
 
 ## 10. WebAuthn / Passkeys（浏览器密钥）
+
+> **实现状态:** ✅ 全部 6 个端点已完成
+> 支持平台认证器（Windows Hello / Mac Touch ID / 手机人脸）和漫游认证器（YubiKey / Google Titan）
+> 算法支持：ES256(P-256) 和 RS256
+> 安全特性：挑战码防重放、Origin/RPID 校验、防克隆计数器检测
 
 ### 10.1 获取用户的凭证列表
 
@@ -1331,13 +1347,13 @@ Authorization: Bearer {access_token}
 
 ### 12.3 用户角色鉴权
 
-JWT 的 access_token 中包含 `role` 字段，用于接口级权限控制。
+JWT 的 access\_token 中包含 `role` 字段，用于接口级权限控制。
 
-| 角色 | 层级 | JWT 中的 role 值 | 说明 |
-|------|------|-----------------|------|
-| 普通用户 | 1 | `user` | 默认角色，可登录、管理个人资料 |
-| 开发者 | 2 | `developer` | 可注册和管理 **自己创建** 的 OIDC 客户端（受 `created_by` 数据隔离约束） |
-| 管理员 | 3 | `admin` | 可管理所有用户、客户端和系统配置 |
+| 角色   | 层级 | JWT 中的 role 值 | 说明                                                |
+| ---- | -- | ------------- | ------------------------------------------------- |
+| 普通用户 | 1  | `user`        | 默认角色，可登录、管理个人资料                                   |
+| 开发者  | 2  | `developer`   | 可注册和管理 **自己创建** 的 OIDC 客户端（受 `created_by` 数据隔离约束） |
+| 管理员  | 3  | `admin`       | 可管理所有用户、客户端和系统配置                                  |
 
 接口权限遵循层级包含关系：`admin` 可访问所有接口，`developer` 可访问 developer 及以下接口，`user` 仅可访问基础接口。权限不足时返回 403。详见 [角色说明](#角色说明)。
 

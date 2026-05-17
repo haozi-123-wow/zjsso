@@ -1,3 +1,6 @@
 .env
 node_modules/
 .gitignore
+frontend/node_modules/
+frontend/package-lock.json
+package-lock.json

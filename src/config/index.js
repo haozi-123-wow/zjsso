@@ -44,6 +44,23 @@ module.exports = {
     id: process.env.IP_API_ID || '',
     key: process.env.IP_API_KEY || ''
   },
+  webauthn: {
+    rpId: process.env.WEBAUTHN_RP_ID || 'localhost',
+    rpName: process.env.WEBAUTHN_RP_NAME || 'ZJSSO System',
+    allowedOrigins: (process.env.WEBAUTHN_ALLOWED_ORIGINS || 'http://localhost,http://localhost:5173,http://localhost:5174,http://localhost:4173').split(',')
+  },
+  social: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3000/api/auth/social/github/callback'
+    },
+    qq: {
+      appId: process.env.QQ_APP_ID || '',
+      appKey: process.env.QQ_APP_KEY || '',
+      callbackUrl: process.env.QQ_CALLBACK_URL || 'http://localhost:3000/api/auth/social/qq/callback'
+    }
+  },
   rateLimit: {
     registerPerIp: { window: 3600, max: 3 },
     emailSendPerIp: { window: 3600, max: 5 },

@@ -8,6 +8,11 @@ const { closeRedis } = require('./database/redis');
 const authRoutes = require('./routes/auth');
 const emailRoutes = require('./routes/email');
 const geetestRoutes = require('./routes/geetest');
+const oidcRoutes = require('./routes/oidc');
+const wellknownRoutes = require('./routes/wellknown');
+const socialRoutes = require('./routes/social');
+const webauthnRoutes = require('./routes/webauthn');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -17,8 +22,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', socialRoutes);
+app.use('/api', socialRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/geetest', geetestRoutes);
+app.use('/api/webauthn', webauthnRoutes);
+app.use('/api', adminRoutes);
+app.use('/oauth', oidcRoutes);
+app.use('/userinfo', oidcRoutes);
+app.use('/.well-known', wellknownRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

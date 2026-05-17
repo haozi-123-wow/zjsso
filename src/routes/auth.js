@@ -68,6 +68,23 @@ async function generateTokens(user) {
 
   const refreshExpiresAt = new Date((now + config.jwt.refreshExpiresIn) * 1000);
 
+  if (config.session.mode === 'stateful') {
+    const redisClient = getRedisClient();
+    await redisClient.set(
+      `token:${accessToken}`,
+      JSON.stringify({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role || 'user',
+        scopes: 'openid profile email',
+        jti
+      }),
+      'PX',
+      config.session.expiresIn * 1000
+    );
+  }
+
   const refreshId = uuidv4();
   await db.query(
     `INSERT INTO refresh_tokens (id, token_hash, client_id, user_id, scopes, expires_at)
@@ -286,13 +303,20 @@ router.post('/logout', authenticate, async (req, res) => {
     const { refresh_token } = req.body;
     const redisClient = getRedisClient();
 
-    if (config.session.mode === 'stateless' && req.user.jti) {
-      await redisClient.set(
-        `blacklist:jti:${req.user.jti}`,
-        'revoked',
-        'PX',
-        config.jwt.expiresIn * 1000
-      );
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+
+      if (config.session.mode === 'stateful') {
+        await redisClient.del(`token:${token}`);
+      } else if (config.session.mode === 'stateless' && req.user.jti) {
+        await redisClient.set(
+          `blacklist:jti:${req.user.jti}`,
+          'revoked',
+          'PX',
+          config.jwt.expiresIn * 1000
+        );
+      }
     }
 
     if (refresh_token) {
