@@ -43,6 +43,7 @@ async function authenticate(req, res, next) {
         id: decoded.sub,
         username: decoded.preferred_username,
         email: decoded.email,
+        role: decoded.role || 'user',
         scopes: decoded.scope,
         jti: decoded.jti
       };

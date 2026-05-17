@@ -13,7 +13,10 @@ async function getPool() {
       database: config.database.name,
       waitForConnections: true,
       connectionLimit: 10,
-      queueLimit: 0
+      queueLimit: 0,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      idleTimeout: 60000
     });
   }
   return pool;

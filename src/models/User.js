@@ -45,11 +45,11 @@ class User {
     const username = `${socialData.provider}_${socialData.provider_user_id.slice(0, 8)}`;
 
     await db.query(
-      `INSERT INTO users (id, username, email, display_name, picture, email_verified, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, username, email, display_name, picture, email_verified, enabled, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [userId, username, socialData.email || `${username}@social.local`,
        socialData.display_name || socialData.provider_username,
-       socialData.provider_avatar, !!socialData.email, true]
+       socialData.provider_avatar, !!socialData.email, true, 'user']
     );
 
     await db.query(
@@ -70,7 +70,7 @@ class User {
     await db.query(
       `INSERT INTO users (id, username, email, password_hash, display_name,
         picture, email_verified, phone, phone_verified, locale, zoneinfo, qq, enabled,
-        register_ip, register_ip_location)
+        role, register_ip, register_ip_location)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
@@ -86,6 +86,7 @@ class User {
         userData.zoneinfo || null,
         userData.qq || null,
         userData.enabled !== false,
+        userData.role || 'user',
         userData.register_ip || null,
         userData.register_ip_location || null
       ]
@@ -98,7 +99,7 @@ class User {
     const allowedFields = [
       'display_name', 'picture', 'email_verified', 'enabled',
       'phone', 'phone_verified', 'locale', 'zoneinfo',
-      'qq', 'email', 'username'
+      'qq', 'email', 'username', 'role'
     ];
 
     const updates = [];
@@ -152,7 +153,7 @@ class User {
 
   static async list(limit = 20, offset = 0) {
     const users = await db.query(
-      'SELECT id, username, email, display_name, email_verified, enabled, created_at FROM users LIMIT ? OFFSET ?',
+      'SELECT id, username, email, display_name, email_verified, enabled, role, created_at FROM users LIMIT ? OFFSET ?',
       [limit, offset]
     );
     const countResult = await db.query('SELECT COUNT(*) as total FROM users');

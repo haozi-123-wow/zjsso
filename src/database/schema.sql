@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `zoneinfo` VARCHAR(50) DEFAULT NULL COMMENT '时区',
   `qq` VARCHAR(20) DEFAULT NULL COMMENT 'QQ 号',
   `enabled` BOOLEAN DEFAULT TRUE COMMENT '账户是否启用',
+  `role` VARCHAR(20) NOT NULL DEFAULT 'user' COMMENT '角色: user(普通用户), developer(开发者), admin(管理员)',
   `register_ip` VARCHAR(45) DEFAULT NULL COMMENT '注册时的 IP 地址',
   `register_ip_location` VARCHAR(255) DEFAULT NULL COMMENT '注册 IP 的归属地',
   `last_login_ip` VARCHAR(45) DEFAULT NULL COMMENT '最后一次登录 IP 地址',
@@ -113,7 +114,7 @@ CREATE TABLE IF NOT EXISTS `access_tokens` (
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `id` VARCHAR(36) PRIMARY KEY COMMENT 'UUID 主键',
   `token_hash` VARCHAR(255) UNIQUE NOT NULL COMMENT 'SHA256(token)哈希值',
-  `client_id` VARCHAR(36) NOT NULL COMMENT '关联客户端 ID',
+  `client_id` VARCHAR(36) DEFAULT NULL COMMENT '关联客户端 ID（直接登录时为空）',
   `user_id` VARCHAR(36) NOT NULL COMMENT '关联用户 ID',
   `scopes` TEXT DEFAULT NULL COMMENT '授权 scope 列表',
   `expires_at` TIMESTAMP NOT NULL COMMENT '过期时间',
@@ -122,7 +123,7 @@ CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX `idx_token_hash` (`token_hash`),
   INDEX `idx_expires_at` (`expires_at`),
-  FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='刷新令牌表';
 

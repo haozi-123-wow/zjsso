@@ -199,7 +199,7 @@ class EmailService {
     }
 
     const canonicalizedQuery = this._canonicalize(params);
-    const stringToSign = `GET&${encodeURIComponent('/')}&${encodeURIComponent(canonicalizedQuery)}`;
+    const stringToSign = `GET&${this._percentEncode('/')}&${this._percentEncode(canonicalizedQuery)}`;
     const signature = crypto.createHmac('sha1', `${config.email.accessKeySecret}&`)
       .update(stringToSign)
       .digest('base64');
@@ -220,10 +220,19 @@ class EmailService {
     }
   }
 
+  _percentEncode(str) {
+    return encodeURIComponent(str)
+      .replace(/!/g, '%21')
+      .replace(/'/g, '%27')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+      .replace(/\*/g, '%2A');
+  }
+
   _canonicalize(params) {
     const keys = Object.keys(params).sort();
     return keys
-      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+      .map(key => `${this._percentEncode(key)}=${this._percentEncode(params[key])}`)
       .join('&');
   }
 

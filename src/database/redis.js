@@ -9,12 +9,16 @@ function getRedisClient() {
       host: config.redis.host,
       port: config.redis.port,
       password: config.redis.password || undefined,
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3
+      connectTimeout: 10000,
+      retryStrategy(times) {
+        if (times > 10) return null;
+        return Math.min(times * 200, 3000);
+      },
+      maxRetriesPerRequest: null
     });
 
     redisClient.on('error', (err) => {
-      console.error('Redis connection error:', err);
+      console.error('Redis connection error:', err.message);
     });
 
     redisClient.on('connect', () => {

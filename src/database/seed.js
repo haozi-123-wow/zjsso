@@ -13,15 +13,15 @@ async function seed() {
     const testPassword = await bcrypt.hash('test123', 10);
 
     await db.query(
-      `INSERT IGNORE INTO users (id, username, email, password_hash, display_name, email_verified, enabled, locale)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [adminUserId, 'admin', 'admin@example.com', adminPassword, 'System Administrator', true, true, 'zh-CN']
+      `INSERT IGNORE INTO users (id, username, email, password_hash, display_name, email_verified, enabled, locale, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [adminUserId, 'admin', 'admin@example.com', adminPassword, 'System Administrator', true, true, 'zh-CN', 'admin']
     );
 
     await db.query(
-      `INSERT IGNORE INTO users (id, username, email, password_hash, display_name, email_verified, enabled, locale, phone, qq)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [testUserId, 'testuser', 'test@example.com', testPassword, 'Test User', true, true, 'zh-CN', '13800138000', '123456789']
+      `INSERT IGNORE INTO users (id, username, email, password_hash, display_name, email_verified, enabled, locale, phone, qq, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [testUserId, 'testuser', 'test@example.com', testPassword, 'Test User', true, true, 'zh-CN', '13800138000', '123456789', 'user']
     );
 
     const publicClientId = uuidv4();

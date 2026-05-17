@@ -39,6 +39,7 @@ async function generateTokens(user) {
     exp: now + config.jwt.expiresIn,
     preferred_username: user.username,
     email: user.email,
+    role: user.role || 'user',
     scope: 'openid profile email'
   };
 
@@ -71,7 +72,7 @@ async function generateTokens(user) {
   await db.query(
     `INSERT INTO refresh_tokens (id, token_hash, client_id, user_id, scopes, expires_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [refreshId, refreshTokenHash, 'zjsso', user.id, 'openid profile email', refreshExpiresAt]
+    [refreshId, refreshTokenHash, null, user.id, 'openid profile email', refreshExpiresAt]
   );
 
   return { accessToken, idToken, refreshToken };
@@ -266,7 +267,8 @@ router.post('/login', loginLimiter, async (req, res) => {
         username: user.username,
         email: user.email,
         display_name: user.display_name,
-        picture: user.picture
+        picture: user.picture,
+        role: user.role || 'user'
       },
       ...(securityNotice ? { security_notice: securityNotice } : {})
     });

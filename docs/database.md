@@ -123,6 +123,7 @@
 | zoneinfo | VARCHAR(50) | NULLABLE | 时区 |
 | qq | VARCHAR(20) | NULLABLE | QQ号 |
 | enabled | BOOLEAN | DEFAULT TRUE | 账户是否启用 |
+| role | VARCHAR(20) | NOT NULL, DEFAULT 'user' | 角色: user(普通用户), developer(开发者), admin(管理员) |
 | register_ip | VARCHAR(45) | NULLABLE | 注册时的IP地址 |
 | register_ip_location | VARCHAR(255) | NULLABLE | 注册IP的归属地（如"中国 天津市 联通"） |
 | last_login_ip | VARCHAR(45) | NULLABLE | 最后一次登录IP地址 |
@@ -161,6 +162,7 @@
 | pkce_required | BOOLEAN | DEFAULT FALSE | 是否强制PKCE |
 | access_token_expires_in | INT | DEFAULT 3600 | access_token过期时间(秒) |
 | refresh_token_expires_in | INT | DEFAULT 604800 | refresh_token过期时间(秒) |
+| created_by | VARCHAR(36) | NULLABLE, FK | 创建者用户ID（关联users.id），用于开发者角色数据隔离 |
 | enabled | BOOLEAN | DEFAULT TRUE | 是否启用 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | ON UPDATE | 更新时间 |
@@ -168,6 +170,7 @@
 **索引:**
 - PRIMARY KEY (`id`)
 - INDEX `idx_client_id` (`client_id`)
+- INDEX `idx_created_by` (`created_by`)
 
 **JSON字段示例:**
 ```json
@@ -232,7 +235,7 @@
 |------|------|------|------|
 | id | VARCHAR(36) | PK | UUID主键 |
 | token_hash | VARCHAR(255) | UNIQUE, NOT NULL | SHA256(token)哈希值 |
-| client_id | VARCHAR(36) | FK, NOT NULL | 关联客户端ID |
+| client_id | VARCHAR(36) | FK, NULLABLE | 关联客户端ID（直接登录时为NULL） |
 | user_id | VARCHAR(36) | FK, NOT NULL | 关联用户ID |
 | scopes | TEXT | NULLABLE | 授权scope列表 |
 | expires_at | TIMESTAMP | NOT NULL | 过期时间 |
@@ -509,6 +512,7 @@ Geetest Validate (二次校验防重用):
 | users | email | UNIQUE | 邮箱登录快速查找 |
 | users | username | UNIQUE | 用户名登录快速查找 |
 | clients | client_id | INDEX | OAuth流程中快速查找客户端 |
+| clients | created_by | INDEX | 按创建者查找客户端（开发者数据隔离） |
 | authorization_codes | expires_at | INDEX | 清理过期授权码 |
 | access_tokens | token_hash | UNIQUE | Token验证快速查找 |
 | access_tokens | expires_at | INDEX | 清理过期token |

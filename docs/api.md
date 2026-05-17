@@ -68,6 +68,18 @@ GET /.well-known/jwks.json
 
 ## 2. 用户注册与登录
 
+### 角色说明
+
+系统内置三种角色，权限层级依次递增：
+
+| 角色 | 层级 | 说明 | 权限 |
+|------|------|------|------|
+| `user` | 1 | 普通用户 | 登录、管理个人资料 |
+| `developer` | 2 | 开发者 | 包含 user 权限 + 注册和管理 **自己创建** 的 OIDC 客户端（无法查看或操作其他开发者的客户端） |
+| `admin` | 3 | 管理员 | 包含 developer 权限 + 管理所有用户和客户端、系统配置 |
+
+> 新注册用户默认为 `user` 角色，管理员可在用户管理界面调整角色。JWT 的 access_token 中携带 `role` 字段用于接口鉴权。`developer` 角色在客户端管理上受 `created_by` 数据隔离约束。详见 [客户端注册与管理](#5-客户端注册与管理)。
+
 ### 2.1 用户注册
 
 创建新的用户账号。
@@ -177,7 +189,8 @@ Content-Type: application/json
     "username": "admin",
     "email": "admin@example.com",
     "display_name": "System Administrator",
-    "picture": null
+    "picture": null,
+    "role": "admin"
   }
 }
 ```
@@ -478,12 +491,16 @@ Authorization: Bearer {access_token}
 
 ## 5. 客户端注册与管理
 
+> 本节接口需要 `admin` 或 `developer` 角色。详见 [角色说明](#角色说明)。
+>
+> **数据隔离说明：** `developer` 角色只能查看、修改和删除**自己创建**的客户端。`admin` 角色可查看和管理**所有**客户端。每个客户端创建时自动记录创建者的用户 ID（`created_by`），作为数据隔离的依据。
+
 ### 5.1 注册客户端
 
 ```
 POST /api/clients/register
 Content-Type: application/json
-Authorization: Bearer {admin_access_token}
+Authorization: Bearer {access_token}
 ```
 
 **请求体:**
@@ -503,6 +520,11 @@ Authorization: Bearer {admin_access_token}
 }
 ```
 
+**处理说明:**
+- 创建时后端自动将当前登录用户的 ID 记录到 `created_by` 字段
+- `developer` 角色创建后只能自己管理该客户端
+- `admin` 角色创建后可以管理该客户端，也可授权给其他用户
+
 **响应 201:**
 
 ```json
@@ -518,6 +540,7 @@ Authorization: Bearer {admin_access_token}
   "token_endpoint_auth_method": "client_secret_basic",
   "pkce_required": false,
   "enabled": true,
+  "created_by": "user-uuid",
   "created_at": "2025-01-01T00:00:00Z"
 }
 ```
@@ -526,8 +549,12 @@ Authorization: Bearer {admin_access_token}
 
 ```
 GET /api/clients
-Authorization: Bearer {admin_access_token}
+Authorization: Bearer {access_token}
 ```
+
+**处理说明:**
+- `developer` 角色仅返回自己创建的客户端列表（`WHERE created_by = 'user_id'`）
+- `admin` 角色返回所有客户端列表
 
 **响应 200:**
 
@@ -544,6 +571,7 @@ Authorization: Bearer {admin_access_token}
       "token_endpoint_auth_method": "none",
       "pkce_required": true,
       "enabled": true,
+      "created_by": "user-uuid",
       "created_at": "2025-01-01T00:00:00Z"
     }
   ],
@@ -555,8 +583,12 @@ Authorization: Bearer {admin_access_token}
 
 ```
 GET /api/clients/:id
-Authorization: Bearer {admin_access_token}
+Authorization: Bearer {access_token}
 ```
+
+**处理说明:**
+- `developer` 角色只能查看自己创建的客户端详情
+- `admin` 角色可以查看任意客户端详情
 
 **响应 200:** 返回客户端对象，结构同上。
 
@@ -565,8 +597,12 @@ Authorization: Bearer {admin_access_token}
 ```
 PUT /api/clients/:id
 Content-Type: application/json
-Authorization: Bearer {admin_access_token}
+Authorization: Bearer {access_token}
 ```
+
+**处理说明:**
+- `developer` 角色只能更新自己创建的客户端
+- `admin` 角色可以更新任意客户端
 
 **请求体:** 需要更新的部分字段。
 
@@ -576,14 +612,20 @@ Authorization: Bearer {admin_access_token}
 
 ```
 DELETE /api/clients/:id
-Authorization: Bearer {admin_access_token}
+Authorization: Bearer {access_token}
 ```
+
+**处理说明:**
+- `developer` 角色只能删除自己创建的客户端
+- `admin` 角色可以删除任意客户端
 
 **响应 204:** 无内容。
 
 ***
 
 ## 6. 用户管理 API
+
+> 本节接口需要 `admin` 角色。详见 [角色说明](#角色说明)。
 
 ### 6.1 获取用户列表
 
@@ -604,6 +646,7 @@ Authorization: Bearer {admin_access_token}
       "display_name": "System Administrator",
       "email_verified": true,
       "enabled": true,
+      "role": "admin",
       "created_at": "2025-01-01T00:00:00Z"
     }
   ],
@@ -1285,6 +1328,18 @@ Authorization: Bearer {access_token}
 | `client_secret_basic` | HTTP Basic Auth 头部（默认） | 机密客户端         |
 | `client_secret_post`  | 客户端凭证放在 POST 请求体中      | 机密客户端         |
 | `none`                | 无需客户端认证                | 公开客户端（需 PKCE） |
+
+### 12.3 用户角色鉴权
+
+JWT 的 access_token 中包含 `role` 字段，用于接口级权限控制。
+
+| 角色 | 层级 | JWT 中的 role 值 | 说明 |
+|------|------|-----------------|------|
+| 普通用户 | 1 | `user` | 默认角色，可登录、管理个人资料 |
+| 开发者 | 2 | `developer` | 可注册和管理 **自己创建** 的 OIDC 客户端（受 `created_by` 数据隔离约束） |
+| 管理员 | 3 | `admin` | 可管理所有用户、客户端和系统配置 |
+
+接口权限遵循层级包含关系：`admin` 可访问所有接口，`developer` 可访问 developer 及以下接口，`user` 仅可访问基础接口。权限不足时返回 403。详见 [角色说明](#角色说明)。
 
 ***
 
