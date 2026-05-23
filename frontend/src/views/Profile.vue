@@ -212,6 +212,48 @@
     </div>
   </div>
 
+  <div class="modal-overlay" v-if="showVerifyModal" @click.self="closeVerifyModal">
+    <div class="modal modal-edit">
+      <div class="modal-header">
+        <h4>安全验证</h4>
+        <button class="modal-close" @click="closeVerifyModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="verify-desc">请选择验证方式以继续操作</p>
+        <div class="verify-methods" v-if="verifyStep === 'select'">
+          <button v-for="m in verifyMethods" :key="m" class="verify-method-btn" @click="selectVerifyMethod(m)">
+            <svg v-if="m === 'email'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="vm-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <svg v-else-if="m === 'totp'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="vm-icon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="vm-icon"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            {{ m === 'email' ? '邮箱验证码' : m === 'totp' ? '身份验证器' : '通行密钥' }}
+          </button>
+        </div>
+        <div v-if="verifyMethod === 'email' && verifyStep === 'input'" class="form-group">
+          <label class="form-label">邮箱验证码</label>
+          <p class="verify-email-hint">已发送至 {{ auth.user?.email }}</p>
+          <div class="verify-code-row">
+            <input v-model="verifyCode" type="text" class="form-input verify-code-input" placeholder="000000" maxlength="6" />
+            <button class="btn-send" @click="sendVerifyEmail" :disabled="verifySending">{{ verifySending ? '发送中' : '重发' }}</button>
+          </div>
+          <button class="btn-primary btn-full" @click="submitVerify" :disabled="verifyChecking">{{ verifyChecking ? '验证中...' : '验证' }}</button>
+          <button class="btn-back" @click="verifyStep = 'select'">返回选择其他方式</button>
+        </div>
+        <div v-if="verifyMethod === 'totp' && verifyStep === 'input'" class="form-group">
+          <label class="form-label">身份验证器动态码</label>
+          <input v-model="verifyCode" type="text" class="form-input verify-code-input" placeholder="000000" maxlength="6" />
+          <button class="btn-primary btn-full" @click="submitVerify" :disabled="verifyChecking">{{ verifyChecking ? '验证中...' : '验证' }}</button>
+          <button class="btn-back" @click="verifyStep = 'select'">返回选择其他方式</button>
+        </div>
+        <div v-if="verifyMethod === 'passkey' && verifyStep === 'input'" class="verify-passkey-section">
+          <p style="font-size:14px;color:#6B7280;text-align:center">使用浏览器通行密钥验证身份</p>
+          <button class="btn-primary btn-full" @click="verifyWithPasskey" :disabled="verifyChecking">{{ verifyChecking ? '验证中...' : '使用通行密钥验证' }}</button>
+          <button class="btn-back" @click="verifyStep = 'select'">返回选择其他方式</button>
+        </div>
+      </div>
+      <div v-if="verifyError" class="verify-error" style="padding:0 28px 16px">{{ verifyError }}</div>
+    </div>
+  </div>
+
   <div class="modal-overlay" v-if="showEditModal" @click.self="closeEditModal">
     <div class="modal modal-edit">
       <div class="modal-header">
@@ -497,6 +539,14 @@ function copyText(text: string) {
   navigator.clipboard.writeText(text).then(() => {
     alert('已复制到剪贴板')
   })
+}
+
+function closeVerifyModal() {
+  showVerifyModal.value = false
+  verifyStep.value = 'select'
+  verifyCode.value = ''
+  verifyError.value = ''
+  verifyCallback = null
 }
 
 async function startVerify(action: string, callback: (ticket: string) => void) {

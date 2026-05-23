@@ -265,15 +265,14 @@ async function verifyTotp() {
       body: JSON.stringify({ temp_token: tempToken.value, code: totpCode.value })
     })
     const data = await res.json()
-    if (data.verified) {
-      const loginData = await auth.login(loginForm.username, loginForm.password, getTestCaptcha())
-      if (loginData.access_token) {
-        if (loginData.security_notice) securityNotice.value = loginData.security_notice
-        const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
-        const redirect = params.get('redirect') || '#/profile'
-        redirecting.value = true
-        setTimeout(() => { window.location.hash = redirect }, 400)
-      }
+    if (data.access_token) {
+      setTokens(data.access_token, data.refresh_token, data.expires_in)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      auth.user = data.user
+      const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+      const redirect = params.get('redirect') || '#/profile'
+      redirecting.value = true
+      setTimeout(() => { window.location.hash = redirect }, 400)
     } else {
       showToast(data.message || '验证码错误')
     }

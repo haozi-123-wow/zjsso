@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 import Login from '@/views/Login.vue'
 import Authorize from '@/views/Authorize.vue'
 import Callback from '@/views/Callback.vue'
@@ -6,7 +6,7 @@ import Profile from '@/views/Profile.vue'
 import Admin from '@/views/Admin.vue'
 import { loadTokens, getAccessToken } from '@/utils/api'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
   { path: '/login', name: 'login', component: Login },
   { path: '/authorize', name: 'authorize', component: Authorize },

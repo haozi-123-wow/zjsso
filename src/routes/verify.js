@@ -54,6 +54,9 @@ async function getMethods(userId) {
 
 router.get('/verify/methods', authenticate, async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const methods = await getMethods(req.user.id);
     res.json({ methods });
   } catch (err) {

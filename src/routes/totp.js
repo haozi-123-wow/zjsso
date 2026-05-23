@@ -8,6 +8,7 @@ const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const { log, ACTION } = require('../services/ActivityLogService');
 const { verifyTicket } = require('./verify');
+const { generateTokens } = require('../services/TokenService');
 
 const router = express.Router();
 
@@ -153,7 +154,32 @@ router.post('/totp/login-check', async (req, res) => {
       return res.status(400).json({ error: 'invalid_grant', message: '验证码错误' });
     }
 
-    res.json({ verified: true, userId: decrypted.userId });
+    const userRows = await db.query('SELECT * FROM users WHERE id = ?', [decrypted.userId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'not_found', message: '用户不存在' });
+    }
+
+    const user = userRows[0];
+    const tokens = await generateTokens(user);
+
+    log(user.id, ACTION.LOGIN, { method: 'totp', security_notice: false }, req);
+
+    res.json({
+      verified: true,
+      access_token: tokens.accessToken,
+      token_type: 'Bearer',
+      expires_in: config.jwt.expiresIn,
+      refresh_token: tokens.refreshToken,
+      id_token: tokens.idToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        picture: user.picture,
+        role: user.role || 'user'
+      }
+    });
   } catch (err) {
     console.error('TOTP login-check error:', err);
     res.status(500).json({ error: 'server_error', message: '验证失败' });
