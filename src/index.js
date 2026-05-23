@@ -15,6 +15,8 @@ const socialRoutes = require('./routes/social');
 const webauthnRoutes = require('./routes/webauthn');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
+const totpRoutes = require('./routes/totp');
+const verifyRoutes = require('./routes/verify');
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use('/api/geetest', geetestRoutes);
 app.use('/api/webauthn', webauthnRoutes);
 app.use('/api', adminRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/auth', totpRoutes.router);
+app.use('/api/auth', verifyRoutes);
 app.use('/oauth', oidcRoutes);
 app.use('/userinfo', oidcRoutes);
 app.use('/.well-known', wellknownRoutes);

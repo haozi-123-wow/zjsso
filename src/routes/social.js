@@ -5,6 +5,7 @@ const githubProvider = require('../services/social/GitHubProvider');
 const qqProvider = require('../services/social/QQProvider');
 const { storeOAuthState, getAllProviders } = require('../services/social/Provider');
 const { authenticate } = require('../middleware/auth');
+const { log, ACTION } = require('../services/ActivityLogService');
 
 const router = express.Router();
 
@@ -52,6 +53,10 @@ router.get('/social/:provider/callback', async (req, res) => {
     const socialData = await provider.handleCallback(code, state);
     const user = await User.findOrCreateSocialUser(socialData);
 
+    if (user) {
+      log(user.id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
+    }
+
     const redirectUrl = socialData.redirect_uri || '/';
     const finalUrl = new URL(redirectUrl, 'http://localhost');
     res.redirect(finalUrl.toString());
@@ -73,7 +78,12 @@ router.get('/user/social/connections', authenticate, async (req, res) => {
 
 router.delete('/user/social/connections/:connectionId', authenticate, async (req, res) => {
   try {
+    const conns = await User.getSocialConnections(req.user.id);
+    const conn = conns.find(c => c.id === req.params.connectionId);
     await User.removeSocialConnection(req.user.id, req.params.connectionId);
+    if (conn) {
+      log(req.user.id, ACTION.UNBIND_SOCIAL, { provider: conn.provider, username: conn.provider_username }, req);
+    }
     res.status(204).end();
   } catch (err) {
     console.error('Remove social connection error:', err);

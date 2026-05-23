@@ -24,13 +24,56 @@ class EmailService {
     return this._sendEmail(email, subject, htmlBody);
   }
 
-  async storeCode(email, code, type) {
+  async sendVerificationEmail(email, code) {
+    const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#667eea,#764ba2);padding:32px 40px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:600;">ZJSSO 单点登录系统</h1>
+            <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">安全验证</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <p style="font-size:16px;color:#333;margin:0 0 20px;">您好！</p>
+            <p style="font-size:14px;color:#666;line-height:1.8;margin:0 0 24px;">
+              您正在进行敏感操作，请输入以下验证码完成验证：
+            </p>
+            <div style="text-align:center;margin:0 auto 32px;padding:24px;background:#f8f8f8;border-radius:8px;">
+              <div style="font-size:36px;letter-spacing:8px;font-weight:700;color:#667eea;font-family:monospace;">${code}</div>
+            </div>
+            <p style="font-size:12px;color:#999;line-height:1.6;margin:0;">
+              此验证码有效期为 <strong>10 分钟</strong>，请勿泄露给他人。<br>
+              如果您没有进行此操作，请忽略此邮件。
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#f8f8f8;padding:20px 40px;text-align:center;border-top:1px solid #eee;">
+            <p style="font-size:12px;color:#999;margin:0;">此邮件由系统自动发送，请勿回复</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+    const subject = '安全验证 - ZJSSO 单点登录系统';
+    return this._sendEmail(email, subject, htmlBody);
+  }
+
+  async storeCode(email, code, type, ttlSeconds = 3600) {
     const client = getRedisClient();
     await client.set(
       `email:code:${email}`,
-      JSON.stringify({ code, type, expires_at: Math.floor(Date.now() / 1000) + 3600 }),
+      JSON.stringify({ code, type, expires_at: Math.floor(Date.now() / 1000) + ttlSeconds }),
       'PX',
-      3600000
+      ttlSeconds * 1000
     );
   }
 

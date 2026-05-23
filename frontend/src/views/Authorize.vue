@@ -11,7 +11,7 @@
     </div>
 
     <div class="auth-container">
-      <div class="auth-card">
+      <div class="auth-card consent-card">
         <div class="consent-header">
           <div class="app-icon">
             <img v-if="client?.logo_uri" :src="client.logo_uri" class="app-logo" alt="" />
@@ -29,10 +29,12 @@
           <h3 class="scope-title">请求权限范围</h3>
           <div class="scope-list">
             <div v-for="scope in scopes" :key="scope.name" class="scope-item">
-              <svg class="scope-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <div>
+              <div class="scope-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div class="scope-content">
                 <span class="scope-name">{{ scope.label }}</span>
                 <span class="scope-desc">{{ scope.desc }}</span>
               </div>
@@ -42,7 +44,10 @@
 
         <div class="consent-actions">
           <button class="btn-cancel" @click="deny">拒绝</button>
-          <button class="btn-approve" @click="approve">授权</button>
+          <button class="btn-approve" @click="approve">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-approve-icon"><polyline points="20 6 9 17 4 12"/></svg>
+            授权
+          </button>
         </div>
       </div>
     </div>
@@ -67,8 +72,11 @@ const scopeMap: Record<string, { label: string; desc: string }> = {
 }
 
 const scopes = computed(() => {
-  if (!params.value.scope) return [scopeMap.openid]
-  return params.value.scope.split(' ').filter(Boolean).map((s: string) => scopeMap[s] || { label: s, desc: '未声明的权限' })
+  if (!params.value.scope) return [{ name: 'openid', ...scopeMap.openid }]
+  return params.value.scope.split(' ').filter(Boolean).map((s: string) => ({
+    name: s,
+    ...(scopeMap[s] || { label: s, desc: '未声明的权限' })
+  }))
 })
 
 onMounted(async () => {
@@ -135,25 +143,33 @@ function deny() {
 </script>
 
 <style scoped>
-.consent-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
-.app-icon { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: rgba(230, 57, 70, 0.08); border-radius: 14px; color: #E63946; flex-shrink: 0; overflow: hidden; }
-.app-icon svg { width: 26px; height: 26px; }
-.app-logo { width: 52px; height: 52px; object-fit: contain; border-radius: 14px; }
+.consent-card { animation: consentIn 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+@keyframes consentIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.consent-header { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; padding-bottom: 28px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.app-icon { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; background: rgba(230, 57, 70, 0.08); border-radius: 16px; color: #E63946; flex-shrink: 0; overflow: hidden; }
+.app-icon svg { width: 28px; height: 28px; }
+.app-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 16px; }
 .app-info { flex: 1; }
-.app-name { font-size: 18px; font-weight: 600; color: #F5F5F5; margin-bottom: 4px; }
-.app-desc { font-size: 13px; color: #6B7280; line-height: 1.4; }
+.app-name { font-size: 20px; font-weight: 700; color: #F5F5F5; margin-bottom: 4px; }
+.app-desc { font-size: 14px; color: #6B7280; line-height: 1.5; }
 
 .scope-section { margin-bottom: 32px; }
-.scope-title { font-size: 12px; font-weight: 600; color: #7C8290; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
-.scope-list { display: flex; flex-direction: column; gap: 12px; }
-.scope-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; }
-.scope-check { width: 18px; height: 18px; color: #10B981; flex-shrink: 0; margin-top: 1px; }
-.scope-name { display: block; font-size: 14px; font-weight: 500; color: #E5E7EB; }
-.scope-desc { display: block; font-size: 12px; color: #6B7280; margin-top: 2px; }
+.scope-title { font-size: 12px; font-weight: 700; color: #7C8290; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.scope-title::before { content: ''; width: 3px; height: 14px; background: #E63946; border-radius: 2px; flex-shrink: 0; }
+.scope-list { display: flex; flex-direction: column; gap: 10px; }
+.scope-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; background: rgba(0, 0, 0, 0.15); border: 1px solid rgba(255, 255, 255, 0.02); border-radius: 12px; transition: all 0.3s ease; }
+.scope-item:hover { border-color: rgba(255,255,255,0.06); }
+.scope-check { width: 24px; height: 24px; flex-shrink: 0; background: rgba(16, 185, 129, 0.12); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.scope-check svg { width: 14px; height: 14px; color: #34D399; }
+.scope-content { flex: 1; }
+.scope-name { display: block; font-size: 15px; font-weight: 600; color: #E5E7EB; }
+.scope-desc { display: block; font-size: 13px; color: #6B7280; margin-top: 2px; }
 
 .consent-actions { display: flex; gap: 12px; }
-.btn-approve { flex: 1; padding: 12px; background: rgba(230, 57, 70, 0.12); border: 1px solid rgba(230, 57, 70, 0.25); border-radius: 8px; color: #E63946; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; font-family: inherit; }
-.btn-approve:hover { background: rgba(230, 57, 70, 0.2); }
-.btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; color: #6B7280; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; font-family: inherit; }
-.btn-cancel:hover { color: #9CA3AF; border-color: rgba(255, 255, 255, 0.1); }
+.btn-approve { flex: 1; padding: 12px 20px; background: rgba(230, 57, 70, 0.12); border: 1px solid rgba(230, 57, 70, 0.25); border-radius: 10px; color: #E63946; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.4s ease; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-approve:hover { background: rgba(230, 57, 70, 0.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(230,57,70,0.1); }
+.btn-approve-icon { width: 18px; height: 18px; }
+.btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; color: #6B7280; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.4s ease; font-family: inherit; }
+.btn-cancel:hover { color: #9CA3AF; border-color: rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.02); }
 </style>

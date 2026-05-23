@@ -318,6 +318,43 @@
           </div>
         </div>
 
+        <div class="modal-overlay" v-if="showCreatedModal" @click.self="showCreatedModal = false">
+          <div class="modal modal-credentials">
+            <div class="modal-header">
+              <h4>{{ credModalTitle }}</h4>
+              <button class="modal-close" @click="showCreatedModal = false">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="cred-warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="warn-icon"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>请妥善保管 Client Secret，关闭后将不再完整显示。</span>
+              </div>
+              <div class="cred-field">
+                <label class="cred-label">Client ID</label>
+                <div class="cred-value-row">
+                  <code class="cred-code">{{ createdClientData.client_id }}</code>
+                  <button class="cred-copy" @click="copyText(createdClientData.client_id)" title="复制 Client ID">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div v-if="createdClientData.client_secret" class="cred-field">
+                <label class="cred-label">Client Secret</label>
+                <div class="cred-value-row">
+                  <code class="cred-code cred-secret">{{ createdClientData.client_secret }}</code>
+                  <button class="cred-copy" @click="copyText(createdClientData.client_secret)" title="复制 Client Secret">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-cancel" @click="showCreatedModal = false">关闭</button>
+              <button class="btn-submit" style="flex:1" @click="showCreatedModal = false">我已保存</button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="filteredClients.length === 0" class="empty"><p>暂无客户端，点击上方按钮创建一个</p></div>
 
         <div v-for="c in filteredClients" :key="c.id" class="client-card">
@@ -345,6 +382,7 @@
             </div>
             <div class="client-actions">
               <button class="btn-table btn-edit" @click="editClient(c)">编辑</button>
+              <button class="btn-table btn-warn" @click="resetClientSecret(c)">重置 Secret</button>
               <button class="btn-table btn-danger" @click="deleteClient(c.id)">删除</button>
             </div>
           </div>
@@ -484,6 +522,9 @@ const editingClient = ref<any>(null)
 const showHelp = ref(false)
 const logoUploading = ref(false)
 const logoPreview = ref<string | null>(null)
+const showCreatedModal = ref(false)
+const createdClientData = ref<any>({})
+const credModalTitle = ref('')
 const clientForm = reactive({
   client_name: '',
   client_description: '',
@@ -610,7 +651,9 @@ async function createClient() {
       clients.value.unshift(data)
       cancelClientForm()
       stats.clientCount++
-      alert(`客户端创建成功！\nClient ID: ${data.client_id}${data.client_secret ? '\nClient Secret: ' + data.client_secret : ''}\n\n请妥善保管 Client Secret，关闭后将不再显示。`)
+      createdClientData.value = data
+      credModalTitle.value = '客户端创建成功'
+      showCreatedModal.value = true
     } else {
       alert(data.message || '创建失败')
     }
@@ -663,6 +706,24 @@ async function deleteClient(id: string) {
       alert(data.message || '删除失败')
     }
   } catch { alert('删除失败') }
+}
+
+async function resetClientSecret(c: any) {
+  if (!confirm(`确定要重置 "${c.client_name}" 的 Client Secret 吗？\n\n重置后，使用旧 Secret 的应用将立即无法获取令牌。`)) return
+  try {
+    const res = await fetch(`${API_BASE}/api/clients/${c.id}/reset-secret`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    })
+    const data = await res.json()
+    if (res.ok && data.client_secret) {
+      createdClientData.value = data
+      credModalTitle.value = 'Client Secret 已重置'
+      showCreatedModal.value = true
+    } else {
+      alert(data.message || '重置失败')
+    }
+  } catch { alert('重置失败') }
 }
 
 function cancelUserForm() {
@@ -1053,6 +1114,20 @@ textarea.form-input { resize: vertical; }
 
 .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; animation: fadeIn 0.3s ease; }
 .toast.success { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6EE7B7; }
+
+.modal-credentials { max-width: 520px !important; }
+.cred-warning { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.12); border-radius: 8px; margin-bottom: 4px; }
+.cred-warning .warn-icon { width: 18px; height: 18px; color: #FCD34D; flex-shrink: 0; margin-top: 1px; }
+.cred-warning span { font-size: 12px; color: #D4A853; line-height: 1.5; }
+.cred-field { padding: 12px 0; }
+.cred-field + .cred-field { border-top: 1px solid rgba(255,255,255,0.04); }
+.cred-label { font-size: 11px; font-weight: 600; color: #7C8290; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px; }
+.cred-value-row { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 14px; }
+.cred-code { flex: 1; font-size: 13px; color: #93C5FD; font-family: 'Cascadia Code', 'Fira Code', monospace; word-break: break-all; line-height: 1.5; user-select: all; }
+.cred-secret { color: #6EE7B7; }
+.cred-copy { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; color: #6B7280; cursor: pointer; transition: all 0.3s ease; padding: 0; font-family: inherit; }
+.cred-copy:hover { background: rgba(230,57,70,0.1); border-color: rgba(230,57,70,0.2); color: #E63946; }
+.copy-icon { width: 16px; height: 16px; }
 
 @media (max-width: 768px) {
   .stats-grid { grid-template-columns: 1fr; }

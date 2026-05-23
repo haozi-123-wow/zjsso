@@ -214,6 +214,24 @@ CREATE TABLE IF NOT EXISTS `user_credentials` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户密钥表(WebAuthn/Passkeys)';
 
 -- ================================================================
+-- 10. user_activity_log - 用户活动日志表
+-- 记录用户在系统中的关键操作，展示在个人详情页供用户查看
+-- ================================================================
+CREATE TABLE IF NOT EXISTS `user_activity_log` (
+  `id` VARCHAR(36) PRIMARY KEY COMMENT 'UUID 主键',
+  `user_id` VARCHAR(36) NOT NULL COMMENT '关联用户 ID',
+  `action` VARCHAR(50) NOT NULL COMMENT '操作类型: login/logout/register/change_password/revoke_consent/register_passkey/delete_passkey/bind_social/unbind_social/update_profile/upload_avatar/delete_avatar',
+  `detail` TEXT DEFAULT NULL COMMENT '操作详情(JSON)',
+  `ip_address` VARCHAR(45) DEFAULT NULL COMMENT '操作时的 IP 地址',
+  `ip_location` VARCHAR(255) DEFAULT NULL COMMENT '操作时的 IP 归属地',
+  `user_agent` TEXT DEFAULT NULL COMMENT '操作时的 User-Agent',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  INDEX `idx_user_id` (`user_id`),
+  INDEX `idx_user_action` (`user_id`, `created_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户活动日志表';
+
+-- ================================================================
 -- 数据清理事件
 -- ================================================================
 

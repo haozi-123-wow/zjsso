@@ -5,6 +5,7 @@ const COS = require('cos-nodejs-sdk-v5');
 const db = require('../database/connection');
 const config = require('../config');
 const { authenticate } = require('../middleware/auth');
+const { log, ACTION } = require('../services/ActivityLogService');
 
 const router = express.Router();
 
@@ -104,13 +105,15 @@ router.get('/avatar-signature', authenticate, async (req, res) => {
 router.post('/avatar-confirm', authenticate, async (req, res) => {
   try {
     const { key } = req.body;
-    if (!key || !key.startsWith('avatars/') || !key.includes(`_${req.user.id}_`)) {
+    if (!key || !key.startsWith('avatars/') || !key.includes(`/${req.user.id}_`)) {
       return res.status(400).json({ error: 'invalid_request', message: '无效的 key' });
     }
 
     const avatarUrl = getCosUrl(key);
 
     await db.query('UPDATE users SET picture = ?, updated_at = NOW() WHERE id = ?', [avatarUrl, req.user.id]);
+
+    log(req.user.id, ACTION.UPLOAD_AVATAR, { key }, req);
 
     res.json({ avatar: avatarUrl });
   } catch (err) {
@@ -151,6 +154,8 @@ router.delete('/avatar', authenticate, async (req, res) => {
     }
 
     await db.query('UPDATE users SET picture = NULL, updated_at = NOW() WHERE id = ?', [req.user.id]);
+
+    log(req.user.id, ACTION.DELETE_AVATAR, null, req);
 
     res.json({ deleted: true });
   } catch (err) {

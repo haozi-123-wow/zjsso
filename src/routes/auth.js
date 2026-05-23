@@ -11,6 +11,8 @@ const emailService = require('../services/EmailService');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const { authenticate } = require('../middleware/auth');
 const { getIpLocation, getClientIp } = require('../services/IpLocationService');
+const { log, ACTION } = require('../services/ActivityLogService');
+const { generateTempToken } = require('./totp');
 
 const router = express.Router();
 
@@ -191,10 +193,36 @@ router.delete('/user/consents/:internalClientId', authenticate, async (req, res)
       'DELETE FROM user_consents WHERE user_id = ? AND client_id = ?',
       [req.user.id, req.params.internalClientId]
     );
+    log(req.user.id, ACTION.REVOKE_CONSENT, { client_id: req.params.internalClientId }, req);
     res.json({ deleted: result.affectedRows > 0 });
   } catch (err) {
     console.error('Delete consent error:', err);
     res.status(500).json({ error: 'server_error', message: '撤销授权失败' });
+  }
+});
+
+router.get('/user/activities', authenticate, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
+    const rows = await db.query(
+      'SELECT id, action, detail, ip_address, ip_location, user_agent, created_at FROM user_activity_log WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [req.user.id, limit, offset]
+    );
+    const countResult = await db.query('SELECT COUNT(*) as total FROM user_activity_log WHERE user_id = ?', [req.user.id]);
+    const activities = rows.map(r => ({
+      id: r.id,
+      action: r.action,
+      detail: r.detail ? (typeof r.detail === 'string' ? (() => { try { return JSON.parse(r.detail) } catch { return r.detail } })() : r.detail) : null,
+      ip_address: r.ip_address,
+      ip_location: r.ip_location,
+      user_agent: r.user_agent,
+      created_at: r.created_at
+    }));
+    res.json({ activities, total: countResult[0].total });
+  } catch (err) {
+    console.error('List activities error:', err);
+    res.status(500).json({ error: 'server_error', message: '获取活动记录失败' });
   }
 });
 
@@ -284,6 +312,11 @@ router.post('/register', registerLimiter, async (req, res) => {
     const activationCode = emailService.generateCode();
     await emailService.storeCode(email, activationCode, 'activation');
     await emailService.sendActivationEmail(email, activationCode);
+
+    log(user.id, ACTION.REGISTER, {
+      username: user.username,
+      email: user.email
+    }, req, registerIpLocation);
 
     res.status(201).json({
       message: '注册成功',
@@ -375,6 +408,28 @@ router.post('/login', loginLimiter, async (req, res) => {
     );
 
     const tokens = await generateTokens(user);
+
+    const totpRows = await db.query('SELECT enabled FROM user_totp WHERE user_id = ? AND enabled = TRUE', [user.id]);
+    if (totpRows.length > 0) {
+      const tempToken = generateTempToken(user.id);
+      return res.json({
+        require_2fa: true,
+        temp_token: tempToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          display_name: user.display_name,
+          picture: user.picture,
+          role: user.role || 'user'
+        }
+      });
+    }
+
+    log(user.id, ACTION.LOGIN, {
+      method: 'password',
+      security_notice: !!securityNotice
+    }, req, loginIpLocation);
 
     res.json({
       access_token: tokens.accessToken,

@@ -7,6 +7,8 @@ const { getRedisClient } = require('../database/redis');
 const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const webauthnService = require('../services/webauthn/WebAuthnService');
+const { log, ACTION } = require('../services/ActivityLogService');
+const { verifyTicket } = require('./verify');
 
 const router = express.Router();
 
@@ -41,12 +43,18 @@ router.post('/register/begin', authenticate, async (req, res) => {
 
 router.post('/register/complete', authenticate, async (req, res) => {
   try {
+    const { ticket } = req.body;
+    if (!ticket || !verifyTicket(ticket, req.user.id, 'register_passkey')) {
+      return res.status(400).json({ error: 'invalid_request', message: '请先完成安全验证' });
+    }
+
     const credential = {
       ...req.body,
       nickname: req.body.nickname || null
     };
 
     const result = await webauthnService.verifyRegistration(req.user.id, credential);
+    log(req.user.id, ACTION.REGISTER_PASSKEY, { nickname: req.body.nickname || null }, req);
     res.status(201).json(result);
   } catch (err) {
     console.error('Register complete error:', err);
@@ -138,6 +146,8 @@ router.post('/login/complete', async (req, res) => {
       [uuidv4(), refreshTokenHash, null, user.id, 'openid profile email', refreshExpiresAt]
     );
 
+    log(user.id, ACTION.LOGIN, { method: 'passkey' }, req);
+
     res.json({
       access_token: accessToken,
       token_type: 'Bearer',
@@ -165,10 +175,15 @@ router.post('/login/complete', async (req, res) => {
 
 router.delete('/credentials/:credentialId', authenticate, async (req, res) => {
   try {
+    const ticket = req.headers['x-verify-ticket'];
+    if (!ticket || !verifyTicket(ticket, req.user.id, 'delete_passkey')) {
+      return res.status(400).json({ error: 'invalid_request', message: '请先完成安全验证' });
+    }
     const deleted = await webauthnService.deleteCredential(req.user.id, req.params.credentialId);
     if (!deleted) {
       return res.status(404).json({ error: 'not_found', message: '凭证不存在' });
     }
+    log(req.user.id, ACTION.DELETE_PASSKEY, { credential_id: req.params.credentialId }, req);
     res.status(204).end();
   } catch (err) {
     console.error('Delete credential error:', err);

@@ -8,6 +8,7 @@ const User = require('../models/User');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { createRateLimiter } = require('../middleware/rateLimiter');
+const { log, ACTION } = require('../services/ActivityLogService');
 
 const router = express.Router();
 
@@ -234,6 +235,36 @@ router.delete('/clients/:id', authenticate, async (req, res) => {
   }
 });
 
+router.post('/clients/:id/reset-secret', authenticate, async (req, res) => {
+  try {
+    const rows = await db.query('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found', message: '客户端不存在' });
+    }
+
+    const client = rows[0];
+
+    if (req.user.role !== 'admin' && client.created_by !== req.user.id) {
+      return res.status(403).json({ error: 'forbidden', message: '无权操作此客户端' });
+    }
+
+    const newSecret = generateClientSecret();
+    const hashedSecret = await bcrypt.hash(newSecret, 10);
+
+    await db.query('UPDATE clients SET client_secret = ? WHERE id = ?', [hashedSecret, req.params.id]);
+
+    log(req.user.id, ACTION.RESET_SECRET, { client_id: client.client_id, client_name: client.client_name }, req);
+
+    res.json({
+      client_id: client.client_id,
+      client_secret: newSecret
+    });
+  } catch (err) {
+    console.error('Reset client secret error:', err);
+    res.status(500).json({ error: 'server_error', message: '重置 Client Secret 失败' });
+  }
+});
+
 router.get('/users', authenticate, requireRole('admin'), async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
@@ -376,6 +407,7 @@ router.put('/users/:id', authenticate, requireRole('admin'), async (req, res) =>
 
     if (req.body.password) {
       await User.changePassword(req.params.id, req.body.password);
+      log(req.params.id, ACTION.CHANGE_PASSWORD, null, req);
     }
 
     const updated = await User.update(req.params.id, updateData);
@@ -410,12 +442,31 @@ router.delete('/users/:id', authenticate, requireRole('admin'), async (req, res)
       return res.status(404).json({ error: 'not_found', message: '用户不存在' });
     }
 
+    await db.query('DELETE FROM user_consents WHERE user_id = ?', [req.params.id]);
+    await db.query('DELETE FROM refresh_tokens WHERE user_id = ?', [req.params.id]);
     await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
 
     res.status(204).end();
   } catch (err) {
     console.error('Delete user error:', err);
     res.status(500).json({ error: 'server_error', message: '删除用户失败' });
+  }
+});
+
+router.post('/users/:id/clear-2fa', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: '用户不存在' });
+    }
+
+    await db.query('DELETE FROM user_totp WHERE user_id = ?', [req.params.id]);
+    log(req.user.id, ACTION.ADMIN_CLEAR_2FA, { target_user: req.params.id, target_username: user.username }, req);
+
+    res.json({ message: '已清除该用户的 2FA 绑定' });
+  } catch (err) {
+    console.error('Clear 2FA error:', err);
+    res.status(500).json({ error: 'server_error', message: '清除 2FA 失败' });
   }
 });
 
