@@ -1,4 +1,5 @@
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const { getRedisClient } = require('../database/redis');
 const db = require('../database/connection');
@@ -24,7 +25,7 @@ const authorizeLimiter = createRateLimiter({
 
 router.get('/authorize', authorizeLimiter, async (req, res) => {
   try {
-    const { client_id, redirect_uri, response_type, scope, state, nonce, code_challenge, code_challenge_method, prompt } = req.query;
+    const { client_id, redirect_uri, response_type, scope, state, nonce, code_challenge, code_challenge_method, prompt, access_token: queryToken } = req.query;
 
     if (!client_id || !redirect_uri || !response_type || !scope) {
       return res.redirect(createErrorRedirect(redirect_uri, 'invalid_request', '缺少必要参数', state));
@@ -62,7 +63,9 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
     }
 
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const bearerToken = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null) || queryToken || null;
+
+    if (!bearerToken) {
       if (prompt === 'none') {
         return res.redirect(createErrorRedirect(redirect_uri, 'login_required', '需要用户登录', state));
       }
@@ -75,16 +78,15 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
 
     let user;
     try {
-      const token = authHeader.substring(7);
       if (config.session.mode === 'stateful') {
         const redis = getRedisClient();
-        const sessionData = await redis.get(`token:${token}`);
+        const sessionData = await redis.get(`token:${bearerToken}`);
         if (!sessionData) {
           return res.redirect(createErrorRedirect(redirect_uri, 'login_required', '令牌无效或已过期', state));
         }
         user = JSON.parse(sessionData);
       } else {
-        const decoded = jwt.verify(token, config.jwt.secret);
+        const decoded = jwt.verify(bearerToken, config.jwt.secret);
         const redis = getRedisClient();
         const isBlacklisted = await redis.get(`blacklist:jti:${decoded.jti}`);
         if (isBlacklisted) {
@@ -100,6 +102,13 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
     if (fullUser.length === 0) {
       return res.redirect(createErrorRedirect(redirect_uri, 'access_denied', '用户不存在或已禁用', state));
     }
+
+    await db.query(
+      `INSERT INTO user_consents (id, user_id, client_id, scopes, granted_at)
+       VALUES (?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE scopes = VALUES(scopes), granted_at = NOW()`,
+      [uuidv4(), fullUser[0].id, client.id, JSON.stringify(validScope.split(' '))]
+    );
 
     const code = await authService.createAuthorizationCode(client, fullUser[0], {
       redirect_uri,

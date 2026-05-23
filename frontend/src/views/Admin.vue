@@ -139,6 +139,23 @@
                 <textarea v-model="clientForm.client_description" class="form-input" placeholder="应用用途说明" rows="2"></textarea>
               </div>
               <div class="form-group">
+                <label class="form-label">应用图标</label>
+                <div class="logo-upload">
+                  <div v-if="logoPreview" class="logo-preview-wrap">
+                    <img :src="logoPreview" class="logo-preview" alt="应用图标" />
+                    <button class="logo-remove" @click="removeLogo" title="移除图标">&times;</button>
+                  </div>
+                  <div class="logo-upload-actions">
+                    <label class="btn-upload">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <span>{{ logoUploading ? '上传中...' : (logoPreview ? '更换图标' : '上传图标') }}</span>
+                      <input type="file" accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp" class="file-input" @change="uploadLogo" :disabled="logoUploading" />
+                    </label>
+                    <span class="logo-hint">支持 PNG/JPG/GIF/SVG/Wep，最大 2MB</span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
                 <label class="form-label">回调地址 *</label>
                 <div v-for="(uri, i) in clientForm.redirect_uris" :key="i" class="uri-row">
                   <input v-model="clientForm.redirect_uris[i]" class="form-input" placeholder="https://myapp.com/callback" />
@@ -306,7 +323,10 @@
         <div v-for="c in filteredClients" :key="c.id" class="client-card">
           <div class="client-main">
             <div class="client-info">
-              <h4 class="client-name">{{ c.client_name }}</h4>
+              <div class="client-name-row">
+                <img v-if="c.logo_uri" :src="c.logo_uri" class="client-logo-sm" alt="" />
+                <h4 class="client-name">{{ c.client_name }}</h4>
+              </div>
               <p v-if="c.client_description" class="client-desc">{{ c.client_description }}</p>
               <div class="client-meta">
                 <span class="meta-tag">{{ c.token_endpoint_auth_method }}</span>
@@ -462,6 +482,8 @@ const clientSearch = ref('')
 const showClientForm = ref(false)
 const editingClient = ref<any>(null)
 const showHelp = ref(false)
+const logoUploading = ref(false)
+const logoPreview = ref<string | null>(null)
 const clientForm = reactive({
   client_name: '',
   client_description: '',
@@ -544,6 +566,7 @@ async function loadUsers() {
 function cancelClientForm() {
   showClientForm.value = false
   editingClient.value = null
+  logoPreview.value = null
   clientForm.client_name = ''
   clientForm.client_description = ''
   clientForm.redirect_uris = ['']
@@ -564,6 +587,7 @@ function editClient(c: any) {
   clientForm.response_types = [...(c.response_types || ['code'])]
   clientForm.token_endpoint_auth_method = c.token_endpoint_auth_method
   clientForm.pkce_required = c.pkce_required
+  logoPreview.value = c.logo_uri || null
   showClientForm.value = true
 }
 
@@ -750,6 +774,67 @@ async function deleteUser(u: any) {
       alert(data.message || '删除失败')
     }
   } catch { alert('删除失败') }
+}
+
+async function uploadLogo(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files || !input.files[0]) return
+  const file = input.files[0]
+  const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp']
+  if (!allowed.includes(file.type)) { alert('仅支持 PNG/JPG/GIF/SVG/WebP 格式'); return }
+  if (file.size > 2 * 1024 * 1024) { alert('Logo 文件大小不能超过 2MB'); return }
+  const clientId = editingClient.value?.id
+  if (!clientId) return
+  logoUploading.value = true
+  try {
+    const sigRes = await fetch(`${API_BASE}/api/upload/client-logo-signature?clientId=${clientId}&filename=${encodeURIComponent(file.name)}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    })
+    if (!sigRes.ok) { const d = await sigRes.json(); alert(d.message || '获取签名失败'); return }
+    const sigData = await sigRes.json()
+    const fd = new FormData()
+    if (sigData.formData) {
+      Object.entries(sigData.formData).forEach(([k, v]) => fd.append(k, v as string))
+    }
+    fd.append('file', file)
+    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd })
+    if (!uploadRes.ok) { alert('上传到 COS 失败'); return }
+    const confirmRes = await fetch(`${API_BASE}/api/upload/client-logo-confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+      body: JSON.stringify({ key: sigData.key, clientId })
+    })
+    if (!confirmRes.ok) { alert('确认上传失败'); return }
+    const confirmData = await confirmRes.json()
+    if (confirmData.logo_uri) {
+      logoPreview.value = confirmData.logo_uri
+      const idx = clients.value.findIndex(c => c.id === clientId)
+      if (idx >= 0) clients.value[idx].logo_uri = confirmData.logo_uri
+      showToast('图标上传成功', 'success')
+    }
+  } catch { alert('上传失败') }
+  finally { logoUploading.value = false; input.value = '' }
+}
+
+async function removeLogo() {
+  const clientId = editingClient.value?.id
+  if (!clientId) return
+  if (!confirm('确定移除应用图标吗？')) return
+  try {
+    const res = await fetch(`${API_BASE}/api/upload/client-logo`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+      body: JSON.stringify({ clientId })
+    })
+    if (res.ok) {
+      logoPreview.value = null
+      const idx = clients.value.findIndex(c => c.id === clientId)
+      if (idx >= 0) clients.value[idx].logo_uri = null
+      showToast('图标已移除', 'success')
+    } else {
+      alert('移除失败')
+    }
+  } catch { alert('移除失败') }
 }
 
 function copyText(text: string) {
@@ -950,6 +1035,21 @@ textarea.form-input { resize: vertical; }
 .page-info { font-size: 12px; color: #6B7280; }
 
 .empty { text-align: center; padding: 48px 20px; color: #6B7280; font-size: 13px; }
+
+.client-name-row { display: flex; align-items: center; gap: 10px; }
+.client-logo-sm { width: 24px; height: 24px; border-radius: 6px; object-fit: contain; flex-shrink: 0; }
+
+.logo-upload { display: flex; flex-direction: column; gap: 10px; }
+.logo-preview-wrap { position: relative; display: inline-flex; align-self: flex-start; }
+.logo-preview { width: 72px; height: 72px; border-radius: 12px; object-fit: contain; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); }
+.logo-remove { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: rgba(239,68,68,0.9); border: none; color: #fff; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; font-family: inherit; }
+.logo-remove:hover { background: #ef4444; }
+.logo-upload-actions { display: flex; flex-direction: column; gap: 4px; }
+.btn-upload { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; color: #9CA3AF; font-size: 13px; cursor: pointer; transition: all 0.3s ease; font-family: inherit; }
+.btn-upload:hover { background: rgba(230,57,70,0.08); border-color: rgba(230,57,70,0.2); color: #E63946; }
+.upload-icon { width: 16px; height: 16px; }
+.file-input { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; }
+.logo-hint { font-size: 11px; color: #4B5058; }
 
 .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 99999; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; animation: fadeIn 0.3s ease; }
 .toast.success { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6EE7B7; }

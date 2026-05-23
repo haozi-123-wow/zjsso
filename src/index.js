@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const config = require('./config');
@@ -13,13 +14,16 @@ const wellknownRoutes = require('./routes/wellknown');
 const socialRoutes = require('./routes/social');
 const webauthnRoutes = require('./routes/webauthn');
 const adminRoutes = require('./routes/admin');
+const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', socialRoutes);
@@ -28,6 +32,7 @@ app.use('/api/email', emailRoutes);
 app.use('/api/geetest', geetestRoutes);
 app.use('/api/webauthn', webauthnRoutes);
 app.use('/api', adminRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/oauth', oidcRoutes);
 app.use('/userinfo', oidcRoutes);
 app.use('/.well-known', wellknownRoutes);

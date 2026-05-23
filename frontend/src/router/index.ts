@@ -4,6 +4,7 @@ import Authorize from '@/views/Authorize.vue'
 import Callback from '@/views/Callback.vue'
 import Profile from '@/views/Profile.vue'
 import Admin from '@/views/Admin.vue'
+import { loadTokens, getAccessToken } from '@/utils/api'
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -17,6 +18,17 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes
+})
+
+router.beforeEach((to, _from, next) => {
+  if (to.meta.requiresAuth) {
+    loadTokens()
+    if (!getAccessToken()) {
+      next({ name: 'login', query: { redirect: to.fullPath } })
+      return
+    }
+  }
+  next()
 })
 
 export default router

@@ -61,6 +61,13 @@ module.exports = {
       callbackUrl: process.env.QQ_CALLBACK_URL || 'http://localhost:3000/api/auth/social/qq/callback'
     }
   },
+  cos: {
+    secretId: process.env.COS_SECRET_ID || '',
+    secretKey: process.env.COS_SECRET_KEY || '',
+    bucket: process.env.COS_BUCKET || '',
+    region: process.env.COS_REGION || '',
+    customDomain: process.env.COS_CUSTOM_DOMAIN || ''
+  },
   rateLimit: {
     registerPerIp: { window: 3600, max: 3 },
     emailSendPerIp: { window: 3600, max: 5 },

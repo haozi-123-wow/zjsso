@@ -95,6 +95,109 @@ async function generateTokens(user) {
   return { accessToken, idToken, refreshToken };
 }
 
+router.get('/client-info', async (req, res) => {
+  try {
+    const { client_id } = req.query;
+    if (!client_id) {
+      return res.status(400).json({ error: 'invalid_request', message: '缺少 client_id' });
+    }
+    const rows = await db.query('SELECT client_id, client_name, client_description, logo_uri, homepage_uri FROM clients WHERE client_id = ? AND enabled = TRUE', [client_id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'not_found', message: '客户端不存在或已禁用' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Client info error:', err);
+    res.status(500).json({ error: 'server_error', message: '获取客户端信息失败' });
+  }
+});
+
+router.get('/check-consent', async (req, res) => {
+  try {
+    const { client_id } = req.query;
+    if (!client_id) {
+      return res.status(400).json({ error: 'invalid_request', message: '缺少 client_id' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'unauthorized', message: '缺少访问令牌' });
+    }
+
+    const token = authHeader.substring(7);
+    let userId;
+    try {
+      if (config.session.mode === 'stateful') {
+        const redis = getRedisClient();
+        const sessionData = await redis.get(`token:${token}`);
+        if (!sessionData) throw new Error('invalid token');
+        userId = JSON.parse(sessionData).id;
+      } else {
+        const decoded = jwt.verify(token, config.jwt.secret);
+        userId = decoded.sub;
+      }
+    } catch {
+      return res.status(401).json({ error: 'invalid_token', message: '令牌无效' });
+    }
+
+    const clientRows = await db.query('SELECT id FROM clients WHERE client_id = ? AND enabled = TRUE', [client_id]);
+    if (clientRows.length === 0) {
+      return res.json({ consented: false });
+    }
+
+    const internalClientId = clientRows[0].id;
+    const consentRows = await db.query('SELECT id FROM user_consents WHERE user_id = ? AND client_id = ?', [userId, internalClientId]);
+
+    res.json({ consented: consentRows.length > 0 });
+  } catch (err) {
+    console.error('Check consent error:', err);
+    res.status(500).json({ error: 'server_error', message: '检查授权状态失败' });
+  }
+});
+
+router.get('/user/consents', authenticate, async (req, res) => {
+  try {
+    const rows = await db.query(
+      `SELECT uc.id, uc.client_id, uc.scopes, uc.granted_at,
+              c.client_name, c.client_description, c.logo_uri, c.client_id as client_key
+       FROM user_consents uc
+       INNER JOIN clients c ON c.id = uc.client_id
+       WHERE uc.user_id = ?
+       ORDER BY uc.granted_at DESC`,
+      [req.user.id]
+    );
+
+    const consents = rows.map(r => ({
+      id: r.id,
+      client_id: r.client_id,
+      client_key: r.client_key,
+      client_name: r.client_name,
+      client_description: r.client_description,
+      logo_uri: r.logo_uri,
+      scopes: typeof r.scopes === 'string' ? JSON.parse(r.scopes) : r.scopes,
+      granted_at: r.granted_at
+    }));
+
+    res.json({ consents });
+  } catch (err) {
+    console.error('List consents error:', err);
+    res.status(500).json({ error: 'server_error', message: '获取已授权应用列表失败' });
+  }
+});
+
+router.delete('/user/consents/:internalClientId', authenticate, async (req, res) => {
+  try {
+    const result = await db.query(
+      'DELETE FROM user_consents WHERE user_id = ? AND client_id = ?',
+      [req.user.id, req.params.internalClientId]
+    );
+    res.json({ deleted: result.affectedRows > 0 });
+  } catch (err) {
+    console.error('Delete consent error:', err);
+    res.status(500).json({ error: 'server_error', message: '撤销授权失败' });
+  }
+});
+
 router.get('/check-available', async (req, res) => {
   const { username, email } = req.query;
   const result = {};

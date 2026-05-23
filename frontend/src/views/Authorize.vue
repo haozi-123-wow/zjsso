@@ -14,7 +14,8 @@
       <div class="auth-card">
         <div class="consent-header">
           <div class="app-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <img v-if="client?.logo_uri" :src="client.logo_uri" class="app-logo" alt="" />
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
             </svg>
           </div>
@@ -51,7 +52,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAccessToken } from '@/utils/api'
+import { getAccessToken, loadTokens } from '@/utils/api'
 import { API_BASE } from '@/utils/api'
 
 const router = useRouter()
@@ -71,6 +72,12 @@ const scopes = computed(() => {
 })
 
 onMounted(async () => {
+  loadTokens()
+  if (!getAccessToken()) {
+    window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
+    return
+  }
+
   const hash = window.location.hash.split('?')
   const queryStr = hash[1] || ''
   const searchParams = new URLSearchParams(queryStr)
@@ -79,8 +86,24 @@ onMounted(async () => {
   if (params.value.client_id) {
     try {
       const res = await fetch(`${API_BASE}/api/auth/client-info?client_id=${params.value.client_id}`)
-      const data = await res.json()
-      client.value = data
+      if (res.ok) {
+        const data = await res.json()
+        client.value = data
+      }
+    } catch {}
+
+    try {
+      const token = getAccessToken()
+      const consentRes = await fetch(`${API_BASE}/api/auth/check-consent?client_id=${params.value.client_id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
+      if (consentRes.ok) {
+        const { consented } = await consentRes.json()
+        if (consented) {
+          await approve()
+          return
+        }
+      }
     } catch {}
   }
 })
@@ -113,8 +136,9 @@ function deny() {
 
 <style scoped>
 .consent-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
-.app-icon { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: rgba(230, 57, 70, 0.08); border-radius: 14px; color: #E63946; flex-shrink: 0; }
+.app-icon { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; background: rgba(230, 57, 70, 0.08); border-radius: 14px; color: #E63946; flex-shrink: 0; overflow: hidden; }
 .app-icon svg { width: 26px; height: 26px; }
+.app-logo { width: 52px; height: 52px; object-fit: contain; border-radius: 14px; }
 .app-info { flex: 1; }
 .app-name { font-size: 18px; font-weight: 600; color: #F5F5F5; margin-bottom: 4px; }
 .app-desc { font-size: 13px; color: #6B7280; line-height: 1.4; }

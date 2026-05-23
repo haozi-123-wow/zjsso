@@ -31,6 +31,8 @@ function formatClient(client) {
     client_id: client.client_id,
     client_name: client.client_name,
     client_description: client.client_description,
+    logo_uri: client.logo_uri || null,
+    homepage_uri: client.homepage_uri || null,
     redirect_uris: typeof client.redirect_uris === 'string' ? JSON.parse(client.redirect_uris) : client.redirect_uris,
     post_logout_redirect_uris: client.post_logout_redirect_uris
       ? (typeof client.post_logout_redirect_uris === 'string' ? JSON.parse(client.post_logout_redirect_uris) : client.post_logout_redirect_uris)

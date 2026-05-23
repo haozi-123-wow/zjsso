@@ -1,5 +1,10 @@
 const express = require('express');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const db = require('../database/connection');
+const { getRedisClient } = require('../database/redis');
+const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const webauthnService = require('../services/webauthn/WebAuthnService');
 
@@ -75,14 +80,78 @@ router.post('/login/complete', async (req, res) => {
       });
     }
 
-    res.json({
-      user_id: user.id,
-      username: user.username,
+    const now = Math.floor(Date.now() / 1000);
+    const jti = uuidv4();
+
+    const accessToken = jwt.sign({
+      iss: config.app.issuer,
+      sub: user.id,
+      aud: 'zjsso',
+      jti,
+      iat: now,
+      exp: now + config.jwt.expiresIn,
+      preferred_username: user.username,
       email: user.email,
-      display_name: user.display_name,
-      picture: user.picture,
       role: user.role || 'user',
-      message: 'WebAuthn 认证成功'
+      scope: 'openid profile email'
+    }, config.jwt.secret, { algorithm: 'HS256' });
+
+    const idToken = jwt.sign({
+      iss: config.app.issuer,
+      sub: user.id,
+      aud: 'zjsso',
+      jti: uuidv4(),
+      iat: now,
+      exp: now + config.jwt.expiresIn,
+      name: user.display_name,
+      preferred_username: user.username,
+      email: user.email,
+      email_verified: !!user.email_verified,
+      picture: user.picture,
+      locale: user.locale || 'zh-CN'
+    }, config.jwt.secret, { algorithm: 'HS256' });
+
+    const refreshToken = uuidv4().replace(/-/g, '') + uuidv4().replace(/-/g, '');
+    const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    const refreshExpiresAt = new Date((now + config.jwt.refreshExpiresIn) * 1000);
+
+    if (config.session.mode === 'stateful') {
+      const redisClient = getRedisClient();
+      await redisClient.set(
+        `token:${accessToken}`,
+        JSON.stringify({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role || 'user',
+          scopes: 'openid profile email',
+          jti
+        }),
+        'PX',
+        config.session.expiresIn * 1000
+      );
+    }
+
+    await db.query(
+      `INSERT INTO refresh_tokens (id, token_hash, client_id, user_id, scopes, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), refreshTokenHash, null, user.id, 'openid profile email', refreshExpiresAt]
+    );
+
+    res.json({
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: config.jwt.expiresIn,
+      refresh_token: refreshToken,
+      id_token: idToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        picture: user.picture,
+        role: user.role || 'user'
+      }
     });
   } catch (err) {
     console.error('Login complete error:', err);

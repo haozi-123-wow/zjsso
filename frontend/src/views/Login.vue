@@ -106,6 +106,10 @@
             <svg viewBox="0 0 24 24" fill="currentColor" class="btn-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-4-4 1.41-1.41L11 14.17l6.59-6.59L19 9l-8 8z"/></svg>
             {{ qqLoading ? '跳转中...' : 'QQ 登录' }}
           </button>
+          <button type="button" class="btn-social btn-passkey" @click="handleWebAuthnLogin" :disabled="webauthnLoading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            {{ webauthnLoading ? '验证中...' : '通行密钥登录' }}
+          </button>
         </div>
 
         <div class="toast" v-if="toast.show" :class="toast.type">{{ toast.message }}</div>
@@ -115,9 +119,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getAccessToken, loadTokens, setTokens, apiPost } from '@/utils/api'
 import { API_BASE } from '@/utils/api'
 
 declare function initGeetest4(config: { captchaId: string; product?: string }, callback: (captcha: any) => void): void
@@ -138,6 +143,7 @@ const regLoading = ref(false)
 const resetLoading = ref(false)
 const githubLoading = ref(false)
 const qqLoading = ref(false)
+const webauthnLoading = ref(false)
 const securityNotice = ref<any>(null)
 
 const loginForm = reactive({ username: '', password: '' })
@@ -286,6 +292,72 @@ function handleQQLogin() {
   const redirect = encodeURIComponent(`${window.location.origin}${window.location.hash ? window.location.hash.replace('#', '') : '/login'}`)
   window.location.href = `${API_BASE}/api/auth/social/qq/login?redirect_uri=${redirect}`
 }
+
+async function handleWebAuthnLogin() {
+  if (!window.PublicKeyCredential) { showToast('当前浏览器不支持通行密钥'); return }
+  webauthnLoading.value = true
+  try {
+    const beginData = await apiPost('/api/webauthn/login/begin', { username: null })
+    const publicKey = beginData.publicKey
+    publicKey.challenge = base64URLToBuffer(publicKey.challenge)
+    if (publicKey.allowCredentials) {
+      publicKey.allowCredentials = publicKey.allowCredentials.map((c: any) => ({
+        ...c, id: base64URLToBuffer(c.id)
+      }))
+    }
+    const cred = await navigator.credentials.get({ publicKey }) as any
+    const data = await apiPost('/api/webauthn/login/complete', {
+      id: cred.id,
+      rawId: bufferToBase64URL(cred.rawId),
+      response: {
+        clientDataJSON: bufferToBase64URL(cred.response.clientDataJSON),
+        authenticatorData: bufferToBase64URL(cred.response.authenticatorData),
+        signature: bufferToBase64URL(cred.response.signature),
+        userHandle: cred.response.userHandle ? bufferToBase64URL(cred.response.userHandle) : null
+      },
+      type: cred.type
+    })
+    if (data.access_token) {
+      setTokens(data.access_token, data.refresh_token, data.expires_in)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+      const redirect = params.get('redirect') || '#/profile'
+      window.location.hash = redirect
+    } else {
+      showToast(data.message || '认证失败')
+    }
+  } catch (e: any) {
+    if (e.name === 'NotAllowedError') { /* user cancelled */ }
+    else { showToast(e.message || '认证失败') }
+  } finally {
+    webauthnLoading.value = false
+  }
+}
+
+function bufferToBase64URL(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64URLToBuffer(base64url: string) {
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+  while (base64.length % 4 !== 0) base64 += '='
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+onMounted(() => {
+  loadTokens()
+  if (getAccessToken()) {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+    const redirect = params.get('redirect') || '#/profile'
+    window.location.hash = redirect
+  }
+})
 </script>
 
 <style scoped>
