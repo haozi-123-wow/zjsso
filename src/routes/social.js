@@ -26,11 +26,11 @@ router.get('/social/:provider/login', async (req, res) => {
     }
 
     const state = crypto.randomBytes(16).toString('hex');
-    const redirectUri = req.query.redirect_uri || req.query.redirect_uri;
+    const redirectUri = req.query.redirect_uri || '/';
 
     await storeOAuthState(provider.name, state, redirectUri);
 
-    const authUrl = provider.getAuthorizationUrl(state, redirectUri);
+    const authUrl = provider.getAuthorizationUrl(state);
     res.redirect(authUrl);
   } catch (err) {
     console.error('Social login error:', err);

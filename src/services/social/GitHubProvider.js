@@ -8,10 +8,10 @@ class GitHubProvider extends SocialProvider {
     super('github', 'github');
   }
 
-  getAuthorizationUrl(state, redirectUri) {
+  getAuthorizationUrl(state) {
     const params = new URLSearchParams({
       client_id: this.providerConfig.clientId,
-      redirect_uri: redirectUri || this.providerConfig.callbackUrl,
+      redirect_uri: this.providerConfig.callbackUrl,
       state,
       scope: 'read:user user:email'
     });

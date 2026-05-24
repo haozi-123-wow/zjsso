@@ -9,11 +9,11 @@ class QQProvider extends SocialProvider {
     super('qq', 'qq');
   }
 
-  getAuthorizationUrl(state, redirectUri) {
+  getAuthorizationUrl(state) {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.providerConfig.appId,
-      redirect_uri: redirectUri || this.providerConfig.callbackUrl,
+      redirect_uri: this.providerConfig.callbackUrl,
       state,
       scope: 'get_user_info'
     });
