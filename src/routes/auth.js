@@ -375,7 +375,8 @@ router.post('/login', loginLimiter, async (req, res) => {
         email: user.email,
         display_name: user.display_name,
         picture: user.picture,
-        role: user.role || 'user'
+        role: user.role || 'user',
+        qq: user.qq
       },
       ...(securityNotice ? { security_notice: securityNotice } : {})
     });

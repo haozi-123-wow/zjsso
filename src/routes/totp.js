@@ -177,7 +177,8 @@ router.post('/totp/login-check', async (req, res) => {
         email: user.email,
         display_name: user.display_name,
         picture: user.picture,
-        role: user.role || 'user'
+        role: user.role || 'user',
+        qq: user.qq
       }
     });
   } catch (err) {

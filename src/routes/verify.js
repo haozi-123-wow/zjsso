@@ -127,7 +127,7 @@ router.post('/verify/check', authenticate, async (req, res) => {
 
 router.put('/profile', authenticate, async (req, res) => {
   try {
-    const { ticket, email, display_name } = req.body;
+    const { ticket, email, qq } = req.body;
     const action = email ? 'change_email' : 'update_profile';
 
     if (!ticket) {
@@ -170,7 +170,11 @@ router.put('/profile', authenticate, async (req, res) => {
       log(req.user.id, ACTION.UPDATE_PROFILE, { display_name }, req);
     }
 
-    const updated = await db.query('SELECT id, username, email, display_name, picture, role FROM users WHERE id = ?', [req.user.id]);
+    if (qq !== undefined) {
+      log(req.user.id, ACTION.UPDATE_PROFILE, { qq }, req);
+    }
+
+    const updated = await db.query('SELECT id, username, email, display_name, picture, role, qq FROM users WHERE id = ?', [req.user.id]);
 
     res.json({
       message: '更新成功',

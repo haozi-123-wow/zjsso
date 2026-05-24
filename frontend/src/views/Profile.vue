@@ -263,8 +263,8 @@
 
       <div class="modal-body" v-if="!editVerifyStep">
         <div class="form-group">
-          <label class="form-label">显示名称</label>
-          <input v-model="editForm.display_name" type="text" class="form-input" placeholder="您的显示名称" />
+          <label class="form-label">QQ号码</label>
+          <input v-model="editForm.qq" type="text" class="form-input" placeholder="您的QQ号码" />
         </div>
         <div class="form-group">
           <label class="form-label">邮箱</label>
@@ -757,7 +757,7 @@ async function submitEditVerify() {
       editEmailVerified.value = true
       editVerifyStep.value = null
       editVerifyCode.value = ''
-      const changed: any = { display_name: editForm.display_name !== auth.user?.display_name ? editForm.display_name : undefined }
+      const changed: any = { qq: editForm.qq !== auth.user?.qq ? editForm.qq : undefined }
       if (editForm.email !== auth.user?.email) changed.email = editForm.email
       await doSaveProfile(data.ticket, changed)
     } else {
