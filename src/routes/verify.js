@@ -149,9 +149,9 @@ router.put('/profile', authenticate, async (req, res) => {
       updates.push('email_verified = ?');
       values.push(false);
     }
-    if (display_name !== undefined) {
-      updates.push('display_name = ?');
-      values.push(display_name || null);
+    if (qq !== undefined) {
+      updates.push('qq = ?');
+      values.push(qq || null);
     }
 
     if (updates.length === 0) {
