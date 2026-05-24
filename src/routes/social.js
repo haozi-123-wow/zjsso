@@ -1,5 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const db = require('../database/connection');
 const User = require('../models/User');
 const githubProvider = require('../services/social/GitHubProvider');
 const qqProvider = require('../services/social/QQProvider');
@@ -43,6 +45,28 @@ router.get('/social/:provider/login', async (req, res) => {
   }
 });
 
+router.get('/social/:provider/bind', authenticate, async (req, res) => {
+  try {
+    const provider = getProvider(req.params.provider);
+    if (!provider || !provider.isEnabled()) {
+      return res.status(400).json({ error: 'unsupported_provider', message: '不支持的登录方式' });
+    }
+
+    const state = crypto.randomBytes(16).toString('hex');
+    const redirectUri = config.app.frontendUrl || config.app.issuer || 'http://localhost:6873';
+    console.log(`[Social] ${req.params.provider} bind initiated for user ${req.user.id}, state=${state.substring(0,8)}...`);
+
+    await storeOAuthState(provider.name, state, redirectUri, req.user.id);
+
+    const authUrl = provider.getAuthorizationUrl(state);
+    console.log(`[Social] Redirecting to ${req.params.provider} for binding`);
+    res.json({ redirect_url: authUrl });
+  } catch (err) {
+    console.error('[Social] bind error:', err);
+    res.status(500).json({ error: 'server_error', message: '绑定失败' });
+  }
+});
+
 router.get('/social/:provider/callback', async (req, res) => {
   try {
     const provider = getProvider(req.params.provider);
@@ -61,6 +85,37 @@ router.get('/social/:provider/callback', async (req, res) => {
 
     const socialData = await provider.handleCallback(code, state);
     console.log(`[Social] ${req.params.provider} handleCallback succeeded, provider_user_id=${socialData.provider_user_id}, username=${socialData.provider_username}`);
+
+    if (socialData.bind_user_id) {
+      const existingConn = await db.query(
+        'SELECT user_id FROM social_connections WHERE provider = ? AND provider_user_id = ?',
+        [socialData.provider, socialData.provider_user_id]
+      );
+      if (existingConn.length > 0 && existingConn[0].user_id !== socialData.bind_user_id) {
+        console.error(`[Social] Conflict: ${req.params.provider} account already bound to user ${existingConn[0].user_id}`);
+        const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
+        return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent(`该${req.params.provider === 'github' ? 'GitHub' : 'QQ'}账号已被其他用户绑定，请先解绑后再操作`)}#/profile`);
+      }
+
+      if (existingConn.length > 0 && existingConn[0].user_id === socialData.bind_user_id) {
+        console.log(`[Social] ${req.params.provider} already bound to this user`);
+        const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
+        return res.redirect(`${frontendBase}/?bind_error=该账号已绑定#/profile`);
+      }
+
+      await db.query(
+        `INSERT INTO social_connections (id, user_id, provider, provider_user_id, provider_username, provider_email, provider_avatar, access_token, refresh_token)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), socialData.bind_user_id, socialData.provider, socialData.provider_user_id,
+         socialData.provider_username, socialData.provider_email, socialData.provider_avatar,
+         socialData.access_token, socialData.refresh_token]
+      );
+
+      log(socialData.bind_user_id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
+      console.log(`[Social] ${req.params.provider} bound to user ${socialData.bind_user_id}`);
+      const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
+      return res.redirect(`${frontendBase}/?bind_success=1#/profile`);
+    }
 
     console.log(`[Social] Looking up or creating user for ${req.params.provider} account...`);
     const user = await User.findOrCreateSocialUser(socialData);

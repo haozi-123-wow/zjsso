@@ -37,8 +37,8 @@ class SocialProvider {
       throw new Error('state 无效或已过期');
     }
 
-    const { redirect_uri } = JSON.parse(stateData);
-    console.log(`[${this.name}] State validated, redirect_uri=${redirect_uri}`);
+    const { redirect_uri, bind_user_id } = JSON.parse(stateData);
+    console.log(`[${this.name}] State validated, redirect_uri=${redirect_uri}${bind_user_id ? `, bind_user_id=${bind_user_id}` : ''}`);
 
     console.log(`[${this.name}] Getting access token...`);
     const tokenData = await this.getAccessToken(code);
@@ -59,16 +59,21 @@ class SocialProvider {
       display_name: profile.display_name,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || null,
-      redirect_uri
+      redirect_uri,
+      bind_user_id: bind_user_id || null
     };
   }
 }
 
-async function storeOAuthState(provider, state, redirectUri) {
+async function storeOAuthState(provider, state, redirectUri, bindUserId) {
   const redis = getRedisClient();
+  const data = { redirect_uri: redirectUri };
+  if (bindUserId) {
+    data.bind_user_id = bindUserId;
+  }
   await redis.set(
     `oauth:${provider}:${state}`,
-    JSON.stringify({ redirect_uri: redirectUri }),
+    JSON.stringify(data),
     'PX',
     600000
   );

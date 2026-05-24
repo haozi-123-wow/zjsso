@@ -178,6 +178,14 @@
                   <button class="cred-delete" @click="unbindSocial(conn.id)">解绑</button>
                 </div>
               </div>
+              <div class="social-bind-btns">
+                <button v-if="!socialConnections.find(c => c.provider === 'github')" class="btn-register-key" :disabled="bindLoading === 'github'" @click="bindSocial('github')">
+                  {{ bindLoading === 'github' ? '绑定中...' : '绑定 GitHub' }}
+                </button>
+                <button v-if="!socialConnections.find(c => c.provider === 'qq')" class="btn-register-key" :disabled="bindLoading === 'qq'" @click="bindSocial('qq')">
+                  {{ bindLoading === 'qq' ? '绑定中...' : '绑定 QQ' }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -334,6 +342,7 @@ const activities = ref<any[]>([])
 const totpStatus = ref<boolean | null>(null)
 const totpLoading = ref(false)
 const totpVerifying = ref(false)
+const bindLoading = ref('')
 const totpSetupData = ref<any>(null)
 const totpVerifyCode = ref('')
 const showVerifyModal = ref(false)
@@ -364,6 +373,16 @@ const roleLabel = computed(() => {
 
 onMounted(async () => {
   if (auth.isLoggedIn) {
+    const bindSuccess = new URLSearchParams(window.location.search).get('bind_success')
+    const bindError = new URLSearchParams(window.location.search).get('bind_error')
+    if (bindSuccess) {
+      alert('社交账号绑定成功')
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+    }
+    if (bindError) {
+      alert(decodeURIComponent(bindError))
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+    }
     try {
       const credData = await apiGet('/api/webauthn/credentials')
       if (credData.credentials) credentials.value = credData.credentials
@@ -943,6 +962,20 @@ async function unbindSocial(connId: string) {
   } catch { alert('解绑失败') }
 }
 
+async function bindSocial(provider: string) {
+  bindLoading.value = provider
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/social/${provider}/bind`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    })
+    const data = await res.json()
+    if (data.redirect_url) {
+      window.open(data.redirect_url, '_blank')
+    }
+  } catch { }
+  finally { bindLoading.value = '' }
+}
+
 async function revokeConsent(item: any) {
   if (!confirm(`确定要撤销"${item.client_name}"的授权吗？撤销后该应用需要重新获得您的授权。`)) return
   try {
@@ -1388,6 +1421,7 @@ function base64URLToBuffer(base64url: string) {
 .cred-delete:hover::before { opacity: 1; }
 .cred-delete:hover { background: transparent; color: #FCA5A5; border-color: rgba(239,68,68,0.2); transform: scale(1.03); }
 .cred-add-bar { margin-top: 24px; text-align: center; }
+.social-bind-btns { margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .social-provider { font-size: 16px; font-weight: 600; color: #E5E7EB; flex: 1; transition: color 0.5s ease; }
 .social-item:hover .social-provider { color: #fff; }
 .social-username { font-size: 14px; color: #6B7280; margin-right: 12px; }
