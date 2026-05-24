@@ -273,7 +273,7 @@ function createErrorRedirect(redirectUri, error, description, state) {
   }
 }
 
-router.get('/userinfo', async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
