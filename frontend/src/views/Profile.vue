@@ -347,7 +347,7 @@ const verifyError = ref('')
 const verifyPendingAction = ref('')
 const verifyTicket = ref('')
 const showEditModal = ref(false)
-const editForm = reactive({ display_name: '', email: '' })
+const editForm = reactive({ qq: '', email: '' })
 const editEmailChanged = computed(() => editForm.email !== auth.user?.email)
 const editEmailVerified = ref(false)
 const editSaving = ref(false)
@@ -670,7 +670,7 @@ async function verifyWithPasskey() {
 }
 
 function openEditProfile() {
-  editForm.display_name = auth.user?.display_name || ''
+  editForm.qq = auth.user?.qq || ''
   editForm.email = auth.user?.email || ''
   editEmailVerified.value = false
   editVerifyStep.value = null
@@ -688,7 +688,7 @@ function closeEditModal() {
 
 async function saveProfile() {
   const changed: any = {}
-  if (editForm.display_name !== (auth.user?.display_name || '')) changed.display_name = editForm.display_name
+  if (editForm.qq !== (auth.user?.qq || '')) changed.qq = editForm.qq
   if (editForm.email !== auth.user?.email) {
     changed.email = editForm.email
     if (!editEmailVerified.value) {
@@ -800,7 +800,7 @@ async function verifyEditWithPasskey() {
     if (data.verified && data.ticket) {
       editEmailVerified.value = true
       editVerifyStep.value = null
-      const changed: any = { display_name: editForm.display_name !== auth.user?.display_name ? editForm.display_name : undefined }
+      const changed: any = { qq: editForm.qq !== auth.user?.qq ? editForm.qq : undefined }
       if (editForm.email !== auth.user?.email) changed.email = editForm.email
       await doSaveProfile(data.ticket, changed)
     } else {
