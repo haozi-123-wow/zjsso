@@ -170,7 +170,7 @@ const webauthnLoading = ref(false)
 const securityNotice = ref<any>(null)
 
 const loginForm = reactive({ username: '', password: '' })
-const regForm = reactive({ username: '', email: '', password: '', confirm_password: '', display_name: '' })
+const regForm = reactive({ username: '', email: '', password: '', confirm_password: '', qq: '' })
 const resetStep = ref(1)
 const resetForm = reactive({ email: '', code: '', password: '' })
 
