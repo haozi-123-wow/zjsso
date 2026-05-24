@@ -97,8 +97,8 @@
             <input v-model="regForm.confirm_password" type="password" class="form-input" placeholder="再次输入密码" required />
           </div>
           <div class="form-group">
-            <label class="form-label">昵称</label>
-            <input v-model="regForm.display_name" type="text" class="form-input" placeholder="选填" />
+            <label class="form-label">QQ号码</label>
+            <input v-model="regForm.qq" type="text" class="form-input" placeholder="选填，方便联系" />
           </div>
           <button type="submit" class="btn-submit" :disabled="regLoading">
             <svg v-if="regLoading" class="btn-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
