@@ -41,8 +41,16 @@ const loading = ref(true)
 const error = ref('')
 const auth = useAuthStore()
 
+function getParams() {
+  const hash = window.location.hash.split('?')
+  if (hash.length > 1) {
+    return new URLSearchParams(hash[1])
+  }
+  return new URLSearchParams(window.location.search)
+}
+
 onMounted(() => {
-  const query = new URLSearchParams(window.location.search)
+  const query = getParams()
 
   // 社交登录回调：携带 access_token 直接登录
   const accessToken = query.get('access_token')
@@ -65,6 +73,7 @@ onMounted(() => {
 
   // OIDC 授权码回调
   const code = query.get('code')
+  const state = query.get('state')
   const err = query.get('error')
 
   loading.value = false
