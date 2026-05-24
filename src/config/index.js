@@ -4,7 +4,8 @@ module.exports = {
   app: {
     port: parseInt(process.env.APP_PORT) || 3000,
     host: process.env.APP_HOST || 'localhost',
-    issuer: process.env.ISSUER || 'http://localhost:3000'
+    issuer: process.env.ISSUER || 'http://localhost:3000',
+    frontendUrl: process.env.FRONTEND_URL || process.env.ISSUER || 'http://localhost:6873'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',

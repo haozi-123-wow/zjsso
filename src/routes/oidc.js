@@ -69,11 +69,11 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
       if (prompt === 'none') {
         return res.redirect(createErrorRedirect(redirect_uri, 'login_required', '需要用户登录', state));
       }
-      return res.status(401).json({
-        error: 'login_required',
-        error_description: '需要用户登录，请先调用 POST /api/auth/login 获取 access_token',
-        login_endpoint: `${config.app.issuer}/api/auth/login`
-      });
+      const queryString = req.url.split('?')[1] || '';
+      const frontendBase = config.app.frontendUrl || config.app.issuer || 'http://localhost:6873';
+      const loginRedirect = encodeURIComponent(`/authorize?${queryString}`);
+      const loginUrl = `${frontendBase}/#/login?redirect=${loginRedirect}`;
+      return res.redirect(loginUrl);
     }
 
     let user;

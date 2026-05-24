@@ -7,7 +7,7 @@ const { getRedisClient } = require('../database/redis');
 
 class EmailService {
   async sendActivationEmail(email, code) {
-    const activationLink = `${config.app.issuer}/api/email/verify-activation?code=${code}&email=${encodeURIComponent(email)}`;
+    const activationLink = `${config.app.frontendUrl}/#/verify-activation?code=${code}&email=${encodeURIComponent(email)}`;
 
     const htmlBody = this._buildActivationHtml(activationLink, code);
     const subject = '请激活您的账号 - ZJSSO 单点登录系统';
@@ -16,7 +16,7 @@ class EmailService {
   }
 
   async sendResetPasswordEmail(email, code) {
-    const resetLink = `${config.app.issuer}/reset-password?code=${code}&email=${encodeURIComponent(email)}`;
+    const resetLink = `${config.app.frontendUrl}/#/reset-password?code=${code}&email=${encodeURIComponent(email)}`;
 
     const htmlBody = this._buildResetPasswordHtml(resetLink, code);
     const subject = '重置您的密码 - ZJSSO 单点登录系统';
