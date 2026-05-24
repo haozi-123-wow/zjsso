@@ -128,20 +128,18 @@ router.post('/verify/check', authenticate, async (req, res) => {
 router.put('/profile', authenticate, async (req, res) => {
   try {
     const { ticket, email, qq } = req.body;
-    const action = email ? 'change_email' : 'update_profile';
-
-    if (!ticket) {
-      return res.status(400).json({ error: 'invalid_request', message: '缺少验证凭据' });
-    }
-    const ticketData = verifyTicket(ticket, req.user.id, action);
-    if (!ticketData) {
-      return res.status(400).json({ error: 'invalid_request', message: '验证凭据无效或已过期' });
-    }
 
     const updates = [];
     const values = [];
 
     if (email !== undefined) {
+      if (!ticket) {
+        return res.status(400).json({ error: 'invalid_request', message: '修改邮箱需先完成安全验证' });
+      }
+      const ticketData = verifyTicket(ticket, req.user.id, 'change_email');
+      if (!ticketData) {
+        return res.status(400).json({ error: 'invalid_request', message: '验证凭据无效或已过期' });
+      }
       const existing = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.user.id]);
       if (existing.length > 0) {
         return res.status(400).json({ error: 'Validation Error', message: '该邮箱已被其他账号使用' });
@@ -166,10 +164,6 @@ router.put('/profile', authenticate, async (req, res) => {
     if (email) {
       log(req.user.id, ACTION.CHANGE_EMAIL, { old: req.user.email, new: email }, req);
     }
-    if (display_name !== undefined) {
-      log(req.user.id, ACTION.UPDATE_PROFILE, { display_name }, req);
-    }
-
     if (qq !== undefined) {
       log(req.user.id, ACTION.UPDATE_PROFILE, { qq }, req);
     }
