@@ -33,13 +33,37 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { setTokens } from '@/utils/api'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const loading = ref(true)
 const error = ref('')
+const auth = useAuthStore()
 
 onMounted(() => {
   const query = new URLSearchParams(window.location.search)
+
+  // 社交登录回调：携带 access_token 直接登录
+  const accessToken = query.get('access_token')
+  const refreshToken = query.get('refresh_token')
+  const expiresIn = query.get('expires_in')
+  const userJson = query.get('user')
+
+  if (accessToken && expiresIn) {
+    setTokens(accessToken, refreshToken || '', parseInt(expiresIn))
+    if (userJson) {
+      try {
+        const userData = JSON.parse(decodeURIComponent(userJson))
+        auth.user = userData
+        localStorage.setItem('user', JSON.stringify(userData))
+      } catch {}
+    }
+    window.location.hash = '#/profile'
+    return
+  }
+
+  // OIDC 授权码回调
   const code = query.get('code')
   const err = query.get('error')
 

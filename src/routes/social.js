@@ -6,6 +6,8 @@ const qqProvider = require('../services/social/QQProvider');
 const { storeOAuthState, getAllProviders } = require('../services/social/Provider');
 const { authenticate } = require('../middleware/auth');
 const { log, ACTION } = require('../services/ActivityLogService');
+const { generateTokens } = require('../services/TokenService');
+const config = require('../config');
 
 const router = express.Router();
 
@@ -64,14 +66,28 @@ router.get('/social/:provider/callback', async (req, res) => {
     const user = await User.findOrCreateSocialUser(socialData);
     console.log(`[Social] ${user ? `User found/created: id=${user.id}, username=${user.username}` : 'User not found/created'}`);
 
-    if (user) {
-      log(user.id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
+    if (!user) {
+      console.error(`[Social] Failed to find or create user for ${req.params.provider}`);
+      return res.status(500).json({ error: 'server_error', message: '用户创建失败' });
     }
 
-    const redirectUrl = socialData.redirect_uri || '/';
-    console.log(`[Social] Redirecting to: ${redirectUrl}`);
-    const finalUrl = new URL(redirectUrl, 'http://localhost');
-    res.redirect(finalUrl.toString());
+    log(user.id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
+
+    const tokens = await generateTokens(user);
+    console.log(`[Social] Tokens generated for user ${user.username}`);
+
+    const frontendBase = config.app.frontendUrl || config.app.issuer || 'http://localhost:6873';
+    const userData = {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      display_name: user.display_name,
+      picture: user.picture,
+      role: user.role || 'user'
+    };
+    const redirectUrl = `${frontendBase}/#/callback?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&id_token=${encodeURIComponent(tokens.idToken)}&expires_in=${config.jwt.expiresIn}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+    console.log(`[Social] Redirecting to frontend callback with tokens`);
+    res.redirect(redirectUrl);
   } catch (err) {
     console.error(`[Social] ${req.params.provider} callback error:`, err.message);
     res.status(401).json({ error: 'social_login_failed', message: err.message || '第三方登录失败' });
