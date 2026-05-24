@@ -85,7 +85,7 @@ router.get('/social/:provider/callback', async (req, res) => {
       picture: user.picture,
       role: user.role || 'user'
     };
-    const redirectUrl = `${frontendBase}/#/callback?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&id_token=${encodeURIComponent(tokens.idToken)}&expires_in=${config.jwt.expiresIn}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+    const redirectUrl = `${frontendBase}/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&id_token=${encodeURIComponent(tokens.idToken)}&expires_in=${config.jwt.expiresIn}&user=${encodeURIComponent(JSON.stringify(userData))}#/callback`;
     console.log(`[Social] Redirecting to frontend callback with tokens`);
     res.redirect(redirectUrl);
   } catch (err) {

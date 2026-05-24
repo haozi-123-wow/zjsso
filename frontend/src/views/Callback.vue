@@ -41,16 +41,8 @@ const loading = ref(true)
 const error = ref('')
 const auth = useAuthStore()
 
-function getParams() {
-  const hash = window.location.hash.split('?')
-  if (hash.length > 1) {
-    return new URLSearchParams(hash[1])
-  }
-  return new URLSearchParams(window.location.search)
-}
-
 onMounted(() => {
-  const query = getParams()
+  const query = new URLSearchParams(window.location.search)
 
   // 社交登录回调：携带 access_token 直接登录
   const accessToken = query.get('access_token')
