@@ -37,10 +37,11 @@ class SocialProvider {
     }
 
     const { redirect_uri } = JSON.parse(stateData);
-    await redis.del(`oauth:${this.name}:${state}`);
 
     const tokenData = await this.getAccessToken(code);
     const profile = await this.getUserProfile(tokenData.access_token);
+
+    await redis.del(`oauth:${this.name}:${state}`);
 
     return {
       provider: this.name,

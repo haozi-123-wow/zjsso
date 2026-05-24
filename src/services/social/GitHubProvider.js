@@ -81,7 +81,7 @@ class GitHubProvider extends SocialProvider {
         path: url.pathname + (url.search || ''),
         method: options.method || 'GET',
         headers: options.headers || {},
-        timeout: 10000
+        timeout: 30000
       }, (res) => {
         let body = '';
         res.on('data', chunk => body += chunk);
