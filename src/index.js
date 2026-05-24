@@ -56,6 +56,19 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
+    console.log('=== ZJSSO Configuration ===');
+    console.log(`APP_PORT:         ${config.app.port}`);
+    console.log(`APP_HOST:         ${config.app.host}`);
+    console.log(`ISSUER:           ${config.app.issuer}`);
+    console.log(`DB_HOST:          ${config.database.host}`);
+    console.log(`DB_PORT:          ${config.database.port}`);
+    console.log(`DB_USER:          ${config.database.user}`);
+    console.log(`DB_NAME:          ${config.database.name}`);
+    console.log(`REDIS_HOST:       ${config.redis.host}`);
+    console.log(`REDIS_PORT:       ${config.redis.port}`);
+    console.log(`SESSION_MODE:     ${config.session.mode}`);
+    console.log(`==========================`);
+
     await getPool();
     console.log('Database connected');
 
