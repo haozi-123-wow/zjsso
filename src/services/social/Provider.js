@@ -33,15 +33,22 @@ class SocialProvider {
     const redis = getRedisClient();
     const stateData = await redis.get(`oauth:${this.name}:${state}`);
     if (!stateData) {
+      console.error(`[${this.name}] State not found or expired in Redis, state=${state.substring(0,8)}...`);
       throw new Error('state 无效或已过期');
     }
 
     const { redirect_uri } = JSON.parse(stateData);
+    console.log(`[${this.name}] State validated, redirect_uri=${redirect_uri}`);
 
+    console.log(`[${this.name}] Getting access token...`);
     const tokenData = await this.getAccessToken(code);
+    console.log(`[${this.name}] Got access token, fetching user profile...`);
+
     const profile = await this.getUserProfile(tokenData.access_token);
+    console.log(`[${this.name}] Profile fetched: id=${profile.id}, username=${profile.username}, email=${profile.email}`);
 
     await redis.del(`oauth:${this.name}:${state}`);
+    console.log(`[${this.name}] State cleared from Redis`);
 
     return {
       provider: this.name,

@@ -22,18 +22,21 @@ router.get('/social/:provider/login', async (req, res) => {
   try {
     const provider = getProvider(req.params.provider);
     if (!provider || !provider.isEnabled()) {
+      console.log(`[Social] ${req.params.provider} login attempted but provider not enabled`);
       return res.status(400).json({ error: 'unsupported_provider', message: '不支持的登录方式' });
     }
 
     const state = crypto.randomBytes(16).toString('hex');
     const redirectUri = req.query.redirect_uri || '/';
+    console.log(`[Social] ${req.params.provider} login initiated, state=${state.substring(0,8)}..., redirect_uri=${redirectUri}`);
 
     await storeOAuthState(provider.name, state, redirectUri);
 
     const authUrl = provider.getAuthorizationUrl(state);
+    console.log(`[Social] Redirecting to ${req.params.provider} authorization page`);
     res.redirect(authUrl);
   } catch (err) {
-    console.error('Social login error:', err);
+    console.error('[Social] login error:', err);
     res.status(500).json({ error: 'server_error', message: '登录失败' });
   }
 });
@@ -42,26 +45,35 @@ router.get('/social/:provider/callback', async (req, res) => {
   try {
     const provider = getProvider(req.params.provider);
     if (!provider) {
+      console.log(`[Social] Callback for unknown provider: ${req.params.provider}`);
       return res.status(400).json({ error: 'unsupported_provider', message: '不支持的登录方式' });
     }
 
     const { code, state } = req.query;
+    console.log(`[Social] ${req.params.provider} callback received, state=${state ? state.substring(0,8)+'...' : 'missing'}, has_code=${!!code}`);
+
     if (!code || !state) {
+      console.error(`[Social] Missing required params: code=${!!code}, state=${!!state}`);
       return res.status(400).json({ error: 'invalid_request', message: '缺少必要参数' });
     }
 
     const socialData = await provider.handleCallback(code, state);
+    console.log(`[Social] ${req.params.provider} handleCallback succeeded, provider_user_id=${socialData.provider_user_id}, username=${socialData.provider_username}`);
+
+    console.log(`[Social] Looking up or creating user for ${req.params.provider} account...`);
     const user = await User.findOrCreateSocialUser(socialData);
+    console.log(`[Social] ${user ? `User found/created: id=${user.id}, username=${user.username}` : 'User not found/created'}`);
 
     if (user) {
       log(user.id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
     }
 
     const redirectUrl = socialData.redirect_uri || '/';
+    console.log(`[Social] Redirecting to: ${redirectUrl}`);
     const finalUrl = new URL(redirectUrl, 'http://localhost');
     res.redirect(finalUrl.toString());
   } catch (err) {
-    console.error('Social callback error:', err);
+    console.error(`[Social] ${req.params.provider} callback error:`, err.message);
     res.status(401).json({ error: 'social_login_failed', message: err.message || '第三方登录失败' });
   }
 });
