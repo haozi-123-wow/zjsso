@@ -83,7 +83,7 @@
               </div>
               <div class="detail-row"><span class="detail-label">用户名</span><span class="detail-value">{{ auth.user?.username }}</span></div>
               <div class="detail-row"><span class="detail-label">邮箱</span><span class="detail-value">{{ auth.user?.email }}</span></div>
-              <div class="detail-row"><span class="detail-label">显示名称</span><span class="detail-value">{{ auth.user?.display_name || '-' }}</span></div>
+              <div class="detail-row"><span class="detail-label">QQ号</span><span class="detail-value">{{ auth.user?.qq || '-' }}</span></div>
               <div class="detail-row"><span class="detail-label">角色</span><span class="detail-value">{{ roleLabel }}</span></div>
             </div>
             <div class="details-card" style="margin-top:20px">
