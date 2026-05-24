@@ -4,6 +4,7 @@ import Authorize from '@/views/Authorize.vue'
 import Callback from '@/views/Callback.vue'
 import Profile from '@/views/Profile.vue'
 import Admin from '@/views/Admin.vue'
+import NotFound from '@/views/NotFound.vue'
 import { loadTokens, getAccessToken } from '@/utils/api'
 
 const routes: RouteRecordRaw[] = [
@@ -12,7 +13,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/authorize', name: 'authorize', component: Authorize },
   { path: '/callback', name: 'callback', component: Callback },
   { path: '/profile', name: 'profile', component: Profile, meta: { requiresAuth: true } },
-  { path: '/admin', name: 'admin', component: Admin, meta: { requiresAuth: true, requiresAdmin: true } }
+  { path: '/admin', name: 'admin', component: Admin, meta: { requiresAuth: true, requiresAdmin: true } },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFound }
 ]
 
 const router = createRouter({

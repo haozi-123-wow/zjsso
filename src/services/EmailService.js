@@ -33,7 +33,7 @@ class EmailService {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
         <tr>
-          <td style="background:linear-gradient(135deg,#667eea,#764ba2);padding:32px 40px;text-align:center;">
+          <td style="background:linear-gradient(135deg,#E63946,#c62a35);padding:32px 40px;text-align:center;">
             <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:600;">ZJSSO 单点登录系统</h1>
             <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">安全验证</p>
           </td>
@@ -45,7 +45,7 @@ class EmailService {
               您正在进行敏感操作，请输入以下验证码完成验证：
             </p>
             <div style="text-align:center;margin:0 auto 32px;padding:24px;background:#f8f8f8;border-radius:8px;">
-              <div style="font-size:36px;letter-spacing:8px;font-weight:700;color:#667eea;font-family:monospace;">${code}</div>
+              <div style="font-size:36px;letter-spacing:8px;font-weight:700;color:#E63946;font-family:monospace;">${code}</div>
             </div>
             <p style="font-size:12px;color:#999;line-height:1.6;margin:0;">
               此验证码有效期为 <strong>10 分钟</strong>，请勿泄露给他人。<br>
@@ -113,7 +113,7 @@ class EmailService {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
         <tr>
-          <td style="background:linear-gradient(135deg,#667eea,#764ba2);padding:32px 40px;text-align:center;">
+          <td style="background:linear-gradient(135deg,#E63946,#c62a35);padding:32px 40px;text-align:center;">
             <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:600;">ZJSSO 单点登录系统</h1>
             <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">账号激活邮件</p>
           </td>
@@ -126,7 +126,7 @@ class EmailService {
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
               <tr>
-                <td align="center" style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:6px;padding:0;">
+                <td align="center" style="background:linear-gradient(135deg,#E63946,#c62a35);border-radius:6px;padding:0;">
                   <a href="${link}" target="_blank" style="display:inline-block;padding:14px 48px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:500;">立即激活账号</a>
                 </td>
               </tr>
@@ -138,7 +138,7 @@ class EmailService {
               ${link}
             </p>
             <p style="font-size:14px;color:#666;line-height:1.8;margin:0 0 16px;">
-              您的验证码为：<strong style="color:#667eea;font-size:20px;letter-spacing:4px;">${code}</strong>
+              您的验证码为：<strong style="color:#E63946;font-size:20px;letter-spacing:4px;">${code}</strong>
             </p>
             <p style="font-size:12px;color:#999;line-height:1.6;margin:0;">
               此链接和验证码有效期为 <strong>1 小时</strong>，请尽快完成激活。<br>
@@ -167,7 +167,7 @@ class EmailService {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
         <tr>
-          <td style="background:linear-gradient(135deg,#f093fb,#f5576c);padding:32px 40px;text-align:center;">
+          <td style="background:linear-gradient(135deg,#E63946,#c62a35);padding:32px 40px;text-align:center;">
             <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:600;">ZJSSO 单点登录系统</h1>
             <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">密码重置邮件</p>
           </td>
@@ -180,7 +180,7 @@ class EmailService {
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
               <tr>
-                <td align="center" style="background:linear-gradient(135deg,#f093fb,#f5576c);border-radius:6px;padding:0;">
+                <td align="center" style="background:linear-gradient(135deg,#E63946,#c62a35);border-radius:6px;padding:0;">
                   <a href="${link}" target="_blank" style="display:inline-block;padding:14px 48px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:500;">重置密码</a>
                 </td>
               </tr>
@@ -192,7 +192,7 @@ class EmailService {
               ${link}
             </p>
             <p style="font-size:14px;color:#666;line-height:1.8;margin:0 0 16px;">
-              您的重置验证码为：<strong style="color:#f5576c;font-size:20px;letter-spacing:4px;">${code}</strong>
+              您的重置验证码为：<strong style="color:#E63946;font-size:20px;letter-spacing:4px;">${code}</strong>
             </p>
             <p style="font-size:12px;color:#999;line-height:1.6;margin:0;">
               此链接和验证码有效期为 <strong>1 小时</strong>。<br>
