@@ -421,6 +421,8 @@
               <div v-else class="user-edit-info">
                 <div class="info-row"><span class="info-label">用户名</span><span>{{ editingUser.username }}</span></div>
                 <div class="info-row"><span class="info-label">邮箱</span><span>{{ editingUser.email }}</span></div>
+                <div class="info-row"><span class="info-label">注册时间</span><span>{{ new Date(editingUser.created_at).toLocaleString() }}</span></div>
+                <div class="info-row" v-if="editingUser.last_login_at"><span class="info-label">最后登录</span><span>{{ new Date(editingUser.last_login_at).toLocaleString() }}</span></div>
               </div>
               <div class="form-group">
                 <label class="form-label">{{ editingUser ? '新密码（留空不修改）' : '密码 *' }}</label>
@@ -429,6 +431,16 @@
               <div class="form-group">
                 <label class="form-label">显示名称</label>
                 <input v-model="userForm.display_name" class="form-input" placeholder="选填" />
+              </div>
+              <div class="form-row">
+                <div class="form-group" style="flex:1">
+                  <label class="form-label">QQ号</label>
+                  <input v-model="userForm.qq" class="form-input" placeholder="QQ号码" />
+                </div>
+                <div class="form-group" style="flex:1">
+                  <label class="form-label">手机号</label>
+                  <input v-model="userForm.phone" class="form-input" placeholder="手机号码" />
+                </div>
               </div>
               <div class="form-row">
                 <div class="form-group" style="flex:1">
@@ -446,6 +458,12 @@
                   </label>
                 </div>
               </div>
+              <div class="form-group">
+                <label class="form-label">邮箱验证</label>
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="userForm.email_verified" /> 邮箱已验证
+                </label>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="btn-cancel" @click="cancelUserForm">取消</button>
@@ -460,9 +478,10 @@
           <div class="table-header">
             <span class="th-name">用户</span>
             <span class="th-email">邮箱</span>
+            <span class="th-qq">QQ号</span>
             <span class="th-role">角色</span>
             <span class="th-status">状态</span>
-            <span class="th-created">注册时间</span>
+            <span class="th-login">最后登录</span>
             <span class="th-actions">操作</span>
           </div>
           <div v-for="u in displayedUsers" :key="u.id" class="table-row">
@@ -471,6 +490,7 @@
               <span class="user-name-text">{{ u.display_name || u.username }}</span>
             </span>
             <span class="th-email">{{ u.email }}</span>
+            <span class="th-qq">{{ u.qq || '-' }}</span>
             <span class="th-role">
               <span :class="['role-tag', u.role]">{{ u.role }}</span>
             </span>
@@ -478,7 +498,7 @@
               <span :class="['status-dot', u.enabled ? 'active' : 'inactive']"></span>
               {{ u.enabled ? '启用' : '禁用' }}
             </span>
-            <span class="th-created">{{ new Date(u.created_at).toLocaleDateString() }}</span>
+            <span class="th-login">{{ u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '-' }}</span>
             <span class="th-actions">
               <button class="btn-table btn-edit" @click="editUser(u)">编辑</button>
               <button :class="['btn-table', u.enabled ? 'btn-warn' : 'btn-success']" @click="toggleUserStatus(u)">
@@ -552,6 +572,7 @@ const showUserForm = ref(false)
 const editingUser = ref<any>(null)
 const userForm = reactive({
   username: '', email: '', password: '', display_name: '',
+  qq: '', phone: '', email_verified: false,
   role: 'user', enabled: true
 })
 
@@ -733,6 +754,9 @@ function cancelUserForm() {
   userForm.email = ''
   userForm.password = ''
   userForm.display_name = ''
+  userForm.qq = ''
+  userForm.phone = ''
+  userForm.email_verified = false
   userForm.role = 'user'
   userForm.enabled = true
 }
@@ -741,6 +765,9 @@ function editUser(u: any) {
   editingUser.value = u
   userForm.password = ''
   userForm.display_name = u.display_name || ''
+  userForm.qq = u.qq || ''
+  userForm.phone = u.phone || ''
+  userForm.email_verified = !!u.email_verified
   userForm.role = u.role
   userForm.enabled = u.enabled
   showUserForm.value = true
@@ -775,6 +802,9 @@ async function updateUser() {
   try {
     const body: any = {
       display_name: userForm.display_name,
+      qq: userForm.qq,
+      phone: userForm.phone,
+      email_verified: userForm.email_verified,
       role: userForm.role,
       enabled: userForm.enabled
     }
@@ -1060,10 +1090,11 @@ textarea.form-input { resize: vertical; }
 .table-row:hover { background: rgba(255, 255, 255, 0.02); }
 
 .th-name { flex: 2; display: flex; align-items: center; gap: 8px; }
-.th-email { flex: 2; }
-.th-role { flex: 1; text-align: center; }
-.th-status { flex: 1; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
-.th-created { flex: 1.5; text-align: center; }
+.th-email { flex: 1.5; }
+.th-qq { flex: 1; text-align: center; font-family: monospace; font-size: 12px; }
+.th-role { flex: 0.8; text-align: center; }
+.th-status { flex: 0.8; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.th-login { flex: 1.5; text-align: center; font-size: 12px; }
 .th-actions { flex: 0 0 200px; text-align: right; display: flex; gap: 4px; justify-content: flex-end; }
 
 .user-avatar-sm { width: 28px; height: 28px; border-radius: 50%; background: rgba(230, 57, 70, 0.12); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #E63946; flex-shrink: 0; }
@@ -1136,7 +1167,8 @@ textarea.form-input { resize: vertical; }
   .client-main { flex-direction: column; }
   .client-actions { flex-direction: row; }
   .table-header, .table-row { font-size: 12px; padding: 10px 12px; }
-  .th-created { display: none; }
+  .th-qq { display: none; }
+  .th-login { display: none; }
   .th-actions { flex: 0 0 140px; flex-wrap: wrap; }
   .admin-section { padding: 20px 16px; }
   .section-header { flex-direction: column; align-items: stretch; }

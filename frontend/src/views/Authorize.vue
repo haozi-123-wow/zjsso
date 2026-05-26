@@ -10,8 +10,8 @@
       </div>
     </div>
 
-    <div class="auth-container">
-      <div class="auth-card consent-card">
+    <div class="auth-container" :class="{ 'consent-exiting': redirecting }">
+      <div class="auth-card consent-card" :class="{ 'consent-fade-out': redirecting }">
         <div class="consent-header">
           <div class="app-icon">
             <img v-if="client?.logo_uri" :src="client.logo_uri" class="app-logo" alt="" />
@@ -43,14 +43,30 @@
         </div>
 
         <div class="consent-actions">
-          <button class="btn-cancel" @click="deny">拒绝</button>
-          <button class="btn-approve" @click="approve">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-approve-icon"><polyline points="20 6 9 17 4 12"/></svg>
-            授权
+          <button class="btn-cancel" @click="deny" :disabled="redirecting">拒绝</button>
+          <button class="btn-approve" @click="approve" :disabled="redirecting">
+            <svg v-if="!redirecting" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-approve-icon"><polyline points="20 6 9 17 4 12"/></svg>
+            <span v-if="redirecting" class="btn-spinner"></span>
+            {{ redirecting ? '跳转中...' : '授权' }}
           </button>
         </div>
       </div>
     </div>
+
+    <Transition name="redirect-overlay">
+      <div v-if="redirecting" class="redirect-overlay">
+        <div class="redirect-card">
+          <div class="redirect-spinner">
+            <div class="spinner-ring"></div>
+          </div>
+          <h3 class="redirect-title">授权成功</h3>
+          <p class="redirect-desc">正在安全跳转至应用...</p>
+          <div class="redirect-progress">
+            <div class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -63,6 +79,7 @@ import { API_BASE } from '@/utils/api'
 const router = useRouter()
 const client = ref<any>(null)
 const params = ref<any>({})
+const redirecting = ref(false)
 
 const scopeMap: Record<string, { label: string; desc: string }> = {
   openid: { label: 'OpenID', desc: '使用您的身份登录' },
@@ -108,6 +125,8 @@ onMounted(async () => {
       if (consentRes.ok) {
         const { consented } = await consentRes.json()
         if (consented) {
+          redirecting.value = true
+          await new Promise(r => setTimeout(r, 800))
           await approve()
           return
         }
@@ -122,6 +141,9 @@ async function approve() {
     window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
     return
   }
+
+  redirecting.value = true
+  await new Promise(r => setTimeout(r, 600))
 
   const queryParams = new URLSearchParams({
     ...params.value,
@@ -146,6 +168,34 @@ function deny() {
 .consent-card { animation: consentIn 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes consentIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
+.consent-exiting { animation: containerShrink 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes containerShrink { to { opacity: 0; transform: scale(0.96); } }
+
+.consent-fade-out { animation: cardFadeOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes cardFadeOut { to { opacity: 0; transform: translateY(-10px) scale(0.98); } }
+
+.btn-approve:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+.btn-cancel:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn-spinner { width: 18px; height: 18px; border: 2px solid rgba(230, 57, 70, 0.2); border-top-color: #E63946; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.redirect-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(12px); }
+.redirect-card { text-align: center; padding: 48px; }
+.redirect-spinner { margin-bottom: 28px; display: flex; align-items: center; justify-content: center; }
+.spinner-ring { width: 64px; height: 64px; border-radius: 50%; border: 4px solid rgba(230, 57, 70, 0.12); border-top-color: #E63946; border-right-color: #E63946; animation: ringSpin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes ringSpin { to { transform: rotate(360deg); } }
+.redirect-title { font-size: 22px; font-weight: 700; color: #F5F5F5; margin: 0 0 8px; }
+.redirect-desc { font-size: 14px; color: #6B7280; margin: 0 0 32px; }
+.redirect-progress { width: 200px; height: 3px; background: rgba(255, 255, 255, 0.06); border-radius: 4px; margin: 0 auto; overflow: hidden; }
+.progress-bar { height: 100%; background: linear-gradient(90deg, #E63946, #ff6b6b); border-radius: 4px; animation: progressSlide 1.2s ease-in-out infinite; }
+@keyframes progressSlide { 0% { width: 0; transform: translateX(0); } 50% { width: 60%; } 100% { width: 100%; transform: translateX(200px); } }
+
+.redirect-overlay-enter-active { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.redirect-overlay-enter-from { opacity: 0; }
+.redirect-overlay-enter-from .redirect-card { opacity: 0; transform: scale(0.9) translateY(10px); }
+.redirect-overlay-enter-active .redirect-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+
 .consent-header { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; padding-bottom: 28px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
 .app-icon { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; background: rgba(230, 57, 70, 0.08); border-radius: 16px; color: #E63946; flex-shrink: 0; overflow: hidden; }
 .app-icon svg { width: 28px; height: 28px; }
@@ -168,8 +218,8 @@ function deny() {
 
 .consent-actions { display: flex; gap: 12px; }
 .btn-approve { flex: 1; padding: 12px 20px; background: rgba(230, 57, 70, 0.12); border: 1px solid rgba(230, 57, 70, 0.25); border-radius: 10px; color: #E63946; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.4s ease; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.btn-approve:hover { background: rgba(230, 57, 70, 0.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(230,57,70,0.1); }
+.btn-approve:hover:not(:disabled) { background: rgba(230, 57, 70, 0.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(230,57,70,0.1); }
 .btn-approve-icon { width: 18px; height: 18px; }
 .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; color: #6B7280; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.4s ease; font-family: inherit; }
-.btn-cancel:hover { color: #9CA3AF; border-color: rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.02); }
+.btn-cancel:hover:not(:disabled) { color: #9CA3AF; border-color: rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.02); }
 </style>
