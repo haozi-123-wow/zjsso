@@ -98,6 +98,18 @@
               │ created_at       │
               │ updated_at       │
               └──────────────────┘
+
+              ┌──────────────────┐
+              │   user_totp      │
+              ├──────────────────┤
+              │ id (PK)          │
+              │ user_id (FK)     │
+              │ secret           │
+              │ enabled          │
+              │ created_at       │
+              │ verified_at      │
+              │ UNIQUE: user_id  │
+              └──────────────────┘
 ```
 
 ---
@@ -162,10 +174,13 @@
 | pkce_required | BOOLEAN | DEFAULT FALSE | 是否强制PKCE |
 | access_token_expires_in | INT | DEFAULT 3600 | access_token过期时间(秒) |
 | refresh_token_expires_in | INT | DEFAULT 604800 | refresh_token过期时间(秒) |
-| created_by | VARCHAR(36) | NULLABLE, FK | 创建者用户ID（关联users.id），用于开发者角色数据隔离 |
+| created_by | VARCHAR(36) | NULLABLE, FK→users(id) | 创建者用户ID，用于开发者角色数据隔离 |
 | enabled | BOOLEAN | DEFAULT TRUE | 是否启用 |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | ON UPDATE | 更新时间 |
+
+**外键:**
+- `created_by` → `users(id)`（逻辑引用，非强外键约束，由应用层维护数据一致性）
 
 **索引:**
 - PRIMARY KEY (`id`)
@@ -356,6 +371,28 @@
 
 ---
 
+### 2.10 `user_totp` - TOTP 双因素认证表
+
+存储用户的 TOTP 密钥信息，用于登录时的二次验证。
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | VARCHAR(36) | PK | UUID主键 |
+| user_id | VARCHAR(36) | FK, NOT NULL | 关联用户ID |
+| secret | VARCHAR(255) | NOT NULL | TOTP密钥(Base32) |
+| enabled | BOOLEAN | DEFAULT FALSE | 是否已启用2FA |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+| verified_at | TIMESTAMP | NULLABLE | 首次验证通过时间 |
+
+**外键:**
+- `user_id` → `users(id)` ON DELETE CASCADE
+
+**唯一索引:** UNIQUE KEY `unique_user_id` (`user_id`)
+
+**安全说明:** 每个用户最多只能启用一个TOTP设备。密钥仅在设置时展示，后续不再明文返回。
+
+---
+
 ## 3. Redis数据结构
 
 ### 3.1 有状态模式 - 会话存储
@@ -526,6 +563,7 @@ Geetest Validate (二次校验防重用):
 | social_connections | provider | INDEX | 按提供商查找 |
 | user_credentials | credential_id | INDEX | WebAuthn凭证ID查找 |
 | user_credentials | user_id | INDEX | 查找用户的所有凭证 |
+| user_totp | user_id | UNIQUE | 用户TOTP记录唯一约束 |
 
 ---
 
@@ -563,3 +601,4 @@ Geetest Validate (二次校验防重用):
 | 邮件验证码 | Redis | 短暂存储，自动过期 |
 | 极验挑战码 | Redis | 短暂存储，快速过期 |
 | 极验二次校验结果 | Redis | 防重用校验，自动过期 |
+| TOTP密钥 | MySQL | 持久化，低频读取 |

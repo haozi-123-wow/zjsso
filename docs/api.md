@@ -178,7 +178,7 @@ Content-Type: application/json
 | pass\_token     | 是  | 极验行为验证通过标识，完成验证后由前端获取  |
 | gen\_time       | 是  | 极验行为验证通过时间戳，完成验证后由前端获取 |
 
-**响应 200（登录成功）:**
+**响应 200（登录成功，无 2FA）:**
 
 ```json
 {
@@ -193,10 +193,39 @@ Content-Type: application/json
     "email": "admin@example.com",
     "display_name": "System Administrator",
     "picture": null,
+    "role": "admin",
+    "qq": "123456789"
+  },
+  "security_notice": {
+    "message": "本次登录 IP 归属地与上次不同，如非本人操作请及时修改密码",
+    "previous_location": "北京市 电信",
+    "current_location": "上海市 电信",
+    "previous_ip": "1.2.3.4",
+    "current_ip": "5.6.7.8"
+  }
+}
+```
+
+> `security_notice` 字段仅在本次登录 IP 归属地与上次不同时返回，否则不包含该字段。
+
+**响应 200（登录成功，需要 2FA）:**
+
+```json
+{
+  "require_2fa": true,
+  "temp_token": "aes-256-cbc-encrypted-temp-token",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "admin",
+    "email": "admin@example.com",
+    "display_name": "System Administrator",
+    "picture": null,
     "role": "admin"
   }
 }
 ```
+
+> 当用户启用了 TOTP 双因素认证时，登录接口返回 `require_2fa: true` 和 `temp_token`，前端需引导用户输入 TOTP 验证码并调用 `POST /api/auth/totp/login-check` 完成登录。
 
 **响应 401:**
 
@@ -213,6 +242,15 @@ Content-Type: application/json
 {
   "error": "account_not_activated",
   "message": "账号尚未激活，请先查收激活邮件"
+}
+```
+
+**响应 403（账号已禁用）:**
+
+```json
+{
+  "error": "account_disabled",
+  "message": "账号已被禁用"
 }
 ```
 
@@ -299,7 +337,232 @@ GET /api/auth/check-available?username=newuser&email=new@example.com
 }
 ```
 
-### 2.6 登录+注册流程说明
+### 2.6 获取客户端登录页信息
+
+获取 OIDC 客户端信息用于登录页展示。
+
+```
+GET /api/auth/client-info?client_id=xxx
+```
+
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| client\_id | 是 | OIDC 客户端标识符 |
+
+**响应 200:**
+
+```json
+{
+  "client_id": "generated-client-id",
+  "client_name": "My Application",
+  "client_description": "Description of my app",
+  "logo_uri": "https://example.com/logo.png",
+  "homepage_uri": "https://example.com"
+}
+```
+
+**响应 404:**
+
+```json
+{
+  "error": "not_found",
+  "message": "客户端不存在或已禁用"
+}
+```
+
+### 2.7 检查用户授权状态
+
+检查当前已登录用户是否已授权指定 OIDC 客户端。
+
+```
+GET /api/auth/check-consent?client_id=xxx
+Authorization: Bearer {access_token}
+```
+
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| client\_id | 是 | OIDC 客户端标识符 |
+
+**响应 200:**
+
+```json
+{
+  "consented": true
+}
+```
+
+### 2.8 获取已授权的应用列表
+
+列出当前用户已授权过的所有 OIDC 客户端。
+
+```
+GET /api/auth/user/consents
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "consents": [
+    {
+      "id": "consent-uuid",
+      "client_id": "internal-client-uuid",
+      "client_key": "client_abc123...",
+      "client_name": "My Application",
+      "client_description": "Description of my app",
+      "logo_uri": "https://example.com/logo.png",
+      "scopes": ["openid", "profile", "email"],
+      "granted_at": "2025-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+### 2.9 撤销授权
+
+撤销当前用户对指定客户端的授权。
+
+```
+DELETE /api/auth/user/consents/:internalClientId
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "deleted": true
+}
+```
+
+### 2.10 获取用户活动记录
+
+获取当前用户的操作活动日志。
+
+```
+GET /api/auth/user/activities
+Authorization: Bearer {access_token}
+```
+
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| limit | 否 | 返回条数（默认 50，最大 200） |
+| offset | 否 | 偏移量（默认 0） |
+
+**响应 200:**
+
+```json
+{
+  "activities": [
+    {
+      "id": "log-uuid",
+      "action": "login",
+      "detail": null,
+      "ip_address": "1.2.3.4",
+      "ip_location": "上海市 电信",
+      "user_agent": "Mozilla/5.0...",
+      "created_at": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "total": 42
+}
+```
+
+**操作类型列表:**
+
+| action | 说明 |
+| --- | --- |
+| `login` | 登录 |
+| `register` | 注册 |
+| `change_password` | 修改密码 |
+| `revoke_consent` | 撤销授权 |
+| `register_passkey` | 注册通行密钥 |
+| `delete_passkey` | 删除通行密钥 |
+| `bind_social` | 绑定社交账号 |
+| `unbind_social` | 解绑社交账号 |
+| `update_profile` | 更新个人资料 |
+| `upload_avatar` | 上传头像 |
+| `delete_avatar` | 删除头像 |
+| `reset_secret` | 重置客户端密钥 |
+| `change_email` | 修改邮箱 |
+| `enable_2fa` | 启用双因素认证 |
+| `disable_2fa` | 关闭双因素认证 |
+| `admin_clear_2fa` | 管理员清除用户 2FA |
+
+### 2.11 更新个人资料
+
+更新当前用户的个人资料（邮箱、QQ号）。修改邮箱需要通过安全验证。
+
+```
+PUT /api/auth/profile
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体:**
+
+```json
+{
+  "ticket": "security-ticket-from-verify",
+  "email": "newemail@example.com",
+  "qq": "987654321"
+}
+```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| ticket | 修改邮箱时必填 | 安全验证凭据，通过验证接口获取 |
+| email | 否 | 新邮箱地址（修改后 email_verified 重置为 false） |
+| qq | 否 | QQ号 |
+
+**响应 200:**
+
+```json
+{
+  "message": "更新成功",
+  "user": {
+    "id": "user-uuid",
+    "username": "testuser",
+    "email": "newemail@example.com",
+    "display_name": "Test User",
+    "picture": null,
+    "role": "user",
+    "qq": "987654321"
+  }
+}
+```
+
+### 2.12 获取邮箱状态
+
+获取当前用户的邮箱地址和验证状态。
+
+```
+GET /api/auth/profile/email-status
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "email": "user@example.com",
+  "verified": true,
+  "is_social_email": false
+}
+```
+
+> `is_social_email` 为 `true` 表示该邮箱来自第三方社交账号（以 `@social.local` 结尾），不可用于接收系统邮件。
+
+### 2.13 登录+注册流程说明
 
 ```
 注册流程:
@@ -323,6 +586,8 @@ GET /api/auth/check-available?username=newuser&email=new@example.com
     → 后端先进行极验二次校验（POST http://gcaptcha4.geetest.com/validate）
     → 二次校验通过 → 支持用户名或邮箱登录
     → 验证密码 → 检查email_verified
+    → 检查账号是否启用
+    → 检查是否启用 TOTP 2FA（若启用则返回 require_2fa: true）
     → 签发 access_token + refresh_token + id_token
     → 返回token + 用户基本信息
 ```
@@ -629,7 +894,32 @@ Authorization: Bearer {access_token}
 
 **响应 204:** 无内容。
 
+### 5.6 重置客户端密钥
+
+重置指定客户端的 `client_secret`。重置后旧的 `client_secret` 立即失效。
+
+```
+POST /api/clients/:id/reset-secret
+Authorization: Bearer {access_token}
+```
+
+**处理说明:**
+
+- `developer` 角色只能重置自己创建的客户端的密钥
+- `admin` 角色可以重置任意客户端的密钥
+
+**响应 200:**
+
+```json
+{
+  "client_id": "client_abc123...",
+  "client_secret": "new-generated-secret"
+}
+```
+
 ***
+
+
 
 ## 6. 用户管理 API
 
@@ -642,6 +932,14 @@ GET /api/users
 Authorization: Bearer {admin_access_token}
 ```
 
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| limit | 否 | 返回条数（默认 50，最大 200） |
+| offset | 否 | 偏移量（默认 0） |
+| search | 否 | 搜索关键词（按用户名、邮箱、显示名称模糊匹配） |
+
 **响应 200:**
 
 ```json
@@ -652,13 +950,26 @@ Authorization: Bearer {admin_access_token}
       "username": "admin",
       "email": "admin@example.com",
       "display_name": "System Administrator",
+      "picture": null,
       "email_verified": true,
+      "phone": "13800138000",
+      "qq": "123456789",
       "enabled": true,
       "role": "admin",
-      "created_at": "2025-01-01T00:00:00Z"
+      "locale": "zh-CN",
+      "zoneinfo": "Asia/Shanghai",
+      "register_ip": "1.2.3.4",
+      "register_ip_location": "北京市 电信",
+      "last_login_ip": "5.6.7.8",
+      "last_login_ip_location": "上海市 电信",
+      "last_login_at": "2025-01-02T00:00:00Z",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-02T00:00:00Z"
     }
   ],
-  "total": 2
+  "total": 2,
+  "limit": 50,
+  "offset": 0
 }
 ```
 
@@ -669,7 +980,7 @@ GET /api/users/:id
 Authorization: Bearer {admin_access_token}
 ```
 
-**响应 200:** 用户对象，包含手机、QQ、语言等扩展信息。
+**响应 200:** 用户对象，返回字段同 6.1 列表中的完整用户信息（含 register_ip、last_login_ip 等全部字段）。
 
 ### 6.3 创建用户
 
@@ -686,9 +997,22 @@ Authorization: Bearer {admin_access_token}
   "username": "newuser",
   "email": "new@example.com",
   "password": "securePassword123",
-  "display_name": "New User"
+  "display_name": "New User",
+  "role": "user",
+  "enabled": true
 }
 ```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| username | 是 | 用户名 |
+| email | 是 | 邮箱 |
+| password | 是 | 密码 |
+| display\_name | 否 | 显示名称 |
+| role | 否 | 角色（默认 `user`） |
+| enabled | 否 | 是否启用（默认 `true`） |
 
 **响应 201:** 创建的用户对象。
 
@@ -700,7 +1024,23 @@ Content-Type: application/json
 Authorization: Bearer {admin_access_token}
 ```
 
-**请求体:** 需要更新的部分字段。
+**请求体:**
+
+```json
+{
+  "display_name": "New Name",
+  "email_verified": true,
+  "enabled": true,
+  "role": "developer",
+  "password": "newPassword123",
+  "phone": "13900139000",
+  "qq": "987654321",
+  "locale": "en-US",
+  "zoneinfo": "America/New_York"
+}
+```
+
+**可更新字段:** `display_name`, `email_verified`, `enabled`, `role`, `password`, `phone`, `qq`, `locale`, `zoneinfo`
 
 **响应 200:** 更新后的用户对象。
 
@@ -711,7 +1051,26 @@ DELETE /api/users/:id
 Authorization: Bearer {admin_access_token}
 ```
 
+**注意:** 管理员不能删除自己的账号（返回 400 错误）。
+
 **响应 204:** 无内容。
+
+### 6.6 清除用户 2FA 绑定
+
+管理员清除指定用户的 TOTP 双因素认证绑定，用于用户丢失验证设备时恢复账号访问。
+
+```
+POST /api/users/:id/clear-2fa
+Authorization: Bearer {admin_access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "message": "已清除该用户的 2FA 绑定"
+}
+```
 
 ***
 
@@ -1016,7 +1375,26 @@ GET /api/auth/social/:provider/login
 
 **响应:** HTTP 302 重定向到第三方 OAuth 授权页面。
 
-### 9.3 第三方登录回调
+### 9.3 绑定第三方账号（已登录用户）
+
+当前已登录用户绑定第三方社交账号。
+
+```
+GET /api/auth/social/:provider/bind
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "redirect_url": "https://github.com/login/oauth/authorize?client_id=xxx&state=yyy&redirect_uri=..."
+}
+```
+
+> 前端收到 `redirect_url` 后，将用户重定向到该地址完成第三方 OAuth 授权流程。授权完成后自动绑定到当前用户账号。
+
+### 9.5 第三方登录回调
 
 用户在第三方平台授权后，由第三方 OAuth 提供者回调到此地址。
 
@@ -1040,7 +1418,7 @@ Location: {original_redirect_uri}?code={oidc_authorization_code}&state={original
 5. 生成 OIDC 授权码
 6. 重定向回原始的 `redirect_uri`
 
-### 9.4 获取用户的社交账号绑定
+### 9.6 获取用户的社交账号绑定
 
 列出当前认证用户已绑定的所有社交账号。
 
@@ -1066,7 +1444,7 @@ Authorization: Bearer {access_token}
 }
 ```
 
-### 9.5 解绑社交账号
+### 9.7 解绑社交账号
 
 从用户解绑指定的社交账号。
 
@@ -1414,15 +1792,7 @@ GEETEST_API_URL=http://gcaptcha4.geetest.com
 
 ## 16. 速率限制
 
-| 端点                  | 限制      | 窗口   |
-| ------------------- | ------- | ---- |
-| `/oauth/token`      | 20 次请求  | 1 分钟 |
-| `/oauth/authorize`  | 30 次请求  | 1 分钟 |
-| `/api/*`            | 100 次请求 | 1 分钟 |
-| `/api/webauthn/*`   | 10 次请求  | 1 分钟 |
-| `/api/email/send-*` | 5 次请求   | 1 分钟 |
-| `/api/geetest/*`    | 30 次请求  | 1 分钟 |
-| `/*`                | 200 次请求 | 1 分钟 |
+详见 [第 26 节 - 速率限制（完整版）](#26-%E9%80%9F%E7%8E%87%E9%99%90%E5%88%B6%E5%AE%8C%E6%95%B4%E7%89%88)。
 
 ***
 
@@ -1435,4 +1805,539 @@ Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
 Access-Control-Allow-Headers: Content-Type, Authorization
 ```
+
+***
+
+## 18. 身份验证 API
+
+> **实现状态:** ✅ 全部 3 个端点已完成
+> 支持三种验证方式：邮箱验证码、TOTP、通行密钥（Passkey）
+> 验证通过后颁发安全凭据（ticket），用于修改邮箱等敏感操作
+
+### 18.1 获取可用验证方式
+
+获取当前用户可用的身份验证方式列表。
+
+```
+GET /api/auth/verify/methods
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "methods": ["email", "totp", "passkey"]
+}
+```
+
+> 根据用户配置返回可用方式，可能的值：`email`（邮箱验证码）、`totp`（身份验证器）、`passkey`（通行密钥）。
+
+### 18.2 发送邮箱验证码
+
+向当前用户的邮箱发送 6 位数字验证码。
+
+```
+POST /api/auth/verify/send-email
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "sent": true
+}
+```
+
+### 18.3 验证身份
+
+验证用户身份并返回安全凭据（ticket），用于后续敏感操作（如修改邮箱）。
+
+```
+POST /api/auth/verify/check
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体（邮箱验证码）:**
+
+```json
+{
+  "method": "email",
+  "code": "123456",
+  "action": "change_email"
+}
+```
+
+**请求体（TOTP 验证码）:**
+
+```json
+{
+  "method": "totp",
+  "code": "123456",
+  "action": "change_email"
+}
+```
+
+**请求体（通行密钥）:**
+
+```json
+{
+  "method": "passkey",
+  "code": "{JSON-serialized-credential-data}",
+  "action": "change_email"
+}
+```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| method | 是 | 验证方式：`email`、`totp`、`passkey` |
+| code | 是 | 验证码或通行密钥凭证数据 |
+| action | 否 | 操作标识（如 `change_email`、`disable_2fa`、`generic`），默认 `generic` |
+
+**响应 200:**
+
+```json
+{
+  "verified": true,
+  "ticket": "encrypted-security-ticket"
+}
+```
+
+> `ticket` 有效期为 5 分钟，仅可用于指定的 `action` 操作。
+
+***
+
+## 19. TOTP 双因素认证 API
+
+> **实现状态:** ✅ 全部 5 个端点已完成
+> 基于 RFC 6238（TOTP）标准，使用 30 秒窗口期
+> 支持 Google Authenticator / Microsoft Authenticator 等标准 TOTP 应用
+
+### 19.1 检查 TOTP 状态
+
+检查当前用户是否已启用 TOTP 双因素认证。
+
+```
+GET /api/auth/totp/status
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "enabled": false
+}
+```
+
+### 19.2 设置 TOTP
+
+开始设置 TOTP 双因素认证，生成密钥和 QR 码。
+
+```
+POST /api/auth/totp/setup
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "otpauth_url": "otpauth://totp/ZJSSO:username?secret=JBSWY3DPEHPK3PXP&issuer=ZJSSO",
+  "qr_code": "data:image/png;base64,iVBORw0KGgo..."
+}
+```
+
+> 前端应将 `qr_code`（Base64 PNG）显示为二维码供用户扫描，或提示用户手动输入 `secret`。调用此接口会覆盖之前的未验证设置。
+
+### 19.3 验证并启用 TOTP
+
+使用 TOTP 验证码验证并启用双因素认证。需先调用 `19.2` 完成设置。
+
+```
+POST /api/auth/totp/verify
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体:**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| code | 是 | 认证器应用中的 6 位数字验证码 |
+
+**响应 200:**
+
+```json
+{
+  "enabled": true,
+  "message": "2FA 已启用"
+}
+```
+
+### 19.4 关闭 TOTP
+
+关闭当前用户的 TOTP 双因素认证。需提供 TOTP 验证码或安全凭据（ticket）。
+
+```
+POST /api/auth/totp/disable
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体（使用 TOTP 验证码）:**
+
+```json
+{
+  "code": "123456"
+}
+```
+
+**请求体（使用安全凭据）:**
+
+```json
+{
+  "ticket": "security-ticket-from-verify"
+}
+```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| code | 二选一 | TOTP 验证码 |
+| ticket | 二选一 | 通过 `POST /api/auth/verify/check` 获取的安全凭据 |
+
+**响应 200:**
+
+```json
+{
+  "enabled": false
+}
+```
+
+### 19.5 使用 TOTP 完成登录
+
+在登录接口返回 `require_2fa: true` 后，使用临时令牌和 TOTP 验证码完成登录。
+
+```
+POST /api/auth/totp/login-check
+Content-Type: application/json
+```
+
+**请求体:**
+
+```json
+{
+  "temp_token": "encrypted-temp-token-from-login",
+  "code": "123456"
+}
+```
+
+**参数说明:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| temp\_token | 是 | 登录接口返回的临时令牌（5 分钟有效） |
+| code | 是 | 认证器应用中的 6 位数字验证码 |
+
+**响应 200（验证成功）:**
+
+```json
+{
+  "verified": true,
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "8xLOxBtZp8",
+  "id_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6...",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "admin",
+    "email": "admin@example.com",
+    "display_name": "System Administrator",
+    "picture": null,
+    "role": "admin",
+    "qq": "123456789"
+  }
+}
+```
+
+***
+
+## 20. 头像/Logo 上传 API（腾讯云 COS）
+
+> **实现状态:** ✅ 全部 6 个端点已完成
+> 使用腾讯云对象存储（COS）存储头像和客户端 Logo
+> 上传方式：前端先获取签名，然后直接 POST 到腾讯云 COS，最后确认上传
+
+### 20.1 获取头像上传签名
+
+获取用于上传头像到腾讯云 COS 的签名参数。
+
+```
+GET /api/upload/avatar-signature?filename=avatar.jpg
+Authorization: Bearer {access_token}
+```
+
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| filename | 是 | 上传的文件名（用于推断扩展名） |
+
+**响应 200:**
+
+```json
+{
+  "uploadUrl": "https://bucket.cos.region.myqcloud.com/",
+  "avatar_url": "https://bucket.cos.region.myqcloud.com/avatars/user-id-123.jpg",
+  "key": "avatars/user-id_1715850000_abcd.jpg",
+  "expired": 1715850300,
+  "formData": {
+    "key": "avatars/user-id_1715850000_abcd.jpg",
+    "policy": "base64-encoded-policy",
+    "q-sign-algorithm": "sha1",
+    "q-ak": "AKIDxxxxx",
+    "q-key-time": "1715850000;1715850300",
+    "q-signature": "hex-signature",
+    "pic-operations": "{\"is_pic_info\":1,\"rules\":[{\"fileid\":\"/avatars/user-id_1715850000_abcd.jpg\",\"rule\":\"imageMogr2/format/webp/quality/85\"}]}"
+  },
+  "constraints": {
+    "allowedExtensions": [".jpg", ".jpeg", ".png", ".gif", ".webp"],
+    "maxFileSize": 2097152
+  }
+}
+```
+
+> 前端使用 `uploadUrl` + `formData` 以 POST 表单方式上传文件到腾讯云 COS。`pic-operations` 指定了上传后自动转 WebP 格式。
+
+### 20.2 确认头像上传
+
+上传头像到 COS 后，通知后端更新用户头像。
+
+```
+POST /api/upload/avatar-confirm
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体:**
+
+```json
+{
+  "key": "avatars/user-id_1715850000_abcd.jpg"
+}
+```
+
+**响应 200:**
+
+```json
+{
+  "avatar": "https://bucket.cos.region.myqcloud.com/avatars/user-id_1715850000_abcd.jpg"
+}
+```
+
+### 20.3 删除头像
+
+删除当前用户的头像（同时删除 COS 中的文件）。
+
+```
+DELETE /api/upload/avatar
+Authorization: Bearer {access_token}
+```
+
+**响应 200:**
+
+```json
+{
+  "deleted": true
+}
+```
+
+### 20.4 获取客户端 Logo 上传签名
+
+获取用于上传客户端 Logo 到腾讯云 COS 的签名参数。
+
+```
+GET /api/upload/client-logo-signature?clientId=xxx&filename=logo.png
+Authorization: Bearer {access_token}
+```
+
+**查询参数:**
+
+| 参数 | 必填 | 说明 |
+| --- | --- | --- |
+| clientId | 是 | 客户端内部 ID（UUID） |
+| filename | 是 | 上传的文件名（用于推断扩展名） |
+
+**响应 200:** 结构与 20.1 类似，包含 `uploadUrl`、`logo_url`、`key`（以 `logos/` 开头）、`formData`、`constraints`。
+
+### 20.5 确认客户端 Logo 上传
+
+上传客户端 Logo 到 COS 后，通知后端更新客户端 Logo 地址。自动删除旧的 Logo 文件。
+
+```
+POST /api/upload/client-logo-confirm
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体:**
+
+```json
+{
+  "key": "logos/client-id_1715850000_abcd.png",
+  "clientId": "client-internal-uuid"
+}
+```
+
+**响应 200:**
+
+```json
+{
+  "logo_uri": "https://bucket.cos.region.myqcloud.com/logos/client-id_1715850000_abcd.png"
+}
+```
+
+### 20.6 删除客户端 Logo
+
+删除指定客户端的 Logo（同时删除 COS 中的文件）。
+
+```
+DELETE /api/upload/client-logo
+Content-Type: application/json
+Authorization: Bearer {access_token}
+```
+
+**请求体:**
+
+```json
+{
+  "clientId": "client-internal-uuid"
+}
+```
+
+**响应 200:**
+
+```json
+{
+  "logo_uri": null
+}
+```
+
+***
+
+## 21. 健康检查
+
+```
+GET /health
+```
+
+**响应 200:**
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-01T00:00:00.000Z"
+}
+```
+
+***
+
+## 22. IP 地理定位配置（环境变量）
+
+系统使用 IP 归属地 API 获取登录/注册时的 IP 地理位置信息。
+
+```
+IP_API_ID=your-ip-api-id
+IP_API_KEY=your-ip-api-key
+```
+
+> 用于记录用户注册 IP 归属地和登录 IP 归属地，在安全通知（异地登录提醒）中使用。
+
+***
+
+## 23. 腾讯云 COS 配置（环境变量）
+
+用于存储用户头像和客户端 Logo。
+
+```
+COS_SECRET_ID=your-cos-secret-id
+COS_SECRET_KEY=your-cos-secret-key
+COS_BUCKET=your-bucket-name
+COS_REGION=ap-guangzhou
+COS_CUSTOM_DOMAIN=https://cdn.example.com
+```
+
+> `COS_CUSTOM_DOMAIN` 可选，设置后头像和 Logo 使用自定义域名访问。
+
+***
+
+## 24. WebAuthn 配置（环境变量）
+
+```
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_RP_NAME=ZJSSO System
+WEBAUTHN_ALLOWED_ORIGINS=http://localhost,http://localhost:5173,http://localhost:5174,http://localhost:4173
+```
+
+***
+
+## 25. 其他环境变量
+
+### JWT 配置
+
+```
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRES_IN=3600
+REFRESH_TOKEN_EXPIRES_IN=604800
+```
+
+### 会话配置
+
+```
+SESSION_MODE=stateless
+SESSION_SECRET=your-session-secret
+SESSION_EXPIRES_IN=86400
+```
+
+### 前端地址配置
+
+```
+FRONTEND_URL=http://localhost:6873
+```
+
+> `FRONTEND_URL` 用于社交登录回调时重定向回前端页面。
+
+---
+
+## 26. 速率限制（完整版）
+
+| 端点 / 限制 | 限制 | 窗口 | 说明 |
+| --- | --- | --- | --- |
+| `/oauth/token` | 20 次请求 | 1 分钟 | Token 端点 |
+| `/oauth/authorize` | 30 次请求 | 1 分钟 | 授权端点 |
+| `/api/auth/register` | 3 次请求 | 1 小时 | 注册（按 IP） |
+| `/api/auth/login` | 10 次请求 | 15 分钟 | 登录（按 IP） |
+| `/api/email/send-*` | 5 次请求 | 1 小时 | 邮件发送（按 IP） |
+| `/api/email/send-*` | 3 次请求 | 24 小时 | 邮件发送（按收件邮箱） |
+| `/api/geetest/*` | 30 次请求 | 1 分钟 | 极验验证 |
+| `/api/clients/register` | 20 次请求 | 1 分钟 | 注册客户端 |
+| `/api/webauthn/*` | 10 次请求 | 1 分钟 | WebAuthn 操作 |
+| `/api/*` | 100 次请求 | 1 分钟 | 通用 API 限制 |
+| `/*` | 200 次请求 | 1 分钟 | 全局限制 |
 

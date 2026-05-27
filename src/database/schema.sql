@@ -61,10 +61,12 @@ CREATE TABLE IF NOT EXISTS `clients` (
   `pkce_required` BOOLEAN DEFAULT FALSE COMMENT '是否强制 PKCE',
   `access_token_expires_in` INT DEFAULT 3600 COMMENT 'access_token 过期时间(秒)',
   `refresh_token_expires_in` INT DEFAULT 604800 COMMENT 'refresh_token 过期时间(秒)',
+  `created_by` VARCHAR(36) DEFAULT NULL COMMENT '创建者的用户 ID（关联 users.id，用于角色数据隔离）',
   `enabled` BOOLEAN DEFAULT TRUE COMMENT '是否启用',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  INDEX `idx_client_id` (`client_id`)
+  INDEX `idx_client_id` (`client_id`),
+  INDEX `idx_created_by` (`created_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='OIDC 客户端表';
 
 -- ================================================================
@@ -232,6 +234,21 @@ CREATE TABLE IF NOT EXISTS `user_activity_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户活动日志表';
 
 -- ================================================================
+-- 11. user_totp - TOTP 双因素认证表
+-- 存储用户的 TOTP 密钥信息，用于登录时的二次验证
+-- ================================================================
+CREATE TABLE IF NOT EXISTS `user_totp` (
+  `id` VARCHAR(36) PRIMARY KEY COMMENT 'UUID 主键',
+  `user_id` VARCHAR(36) NOT NULL COMMENT '关联用户 ID',
+  `secret` VARCHAR(255) NOT NULL COMMENT 'TOTP 密钥(Base32)',
+  `enabled` BOOLEAN DEFAULT FALSE COMMENT '是否已启用 2FA',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `verified_at` TIMESTAMP NULL DEFAULT NULL COMMENT '首次验证通过时间',
+  UNIQUE KEY `unique_user_id` (`user_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='TOTP 双因素认证表';
+
+-- ================================================================
 -- 数据清理事件
 -- ================================================================
 
@@ -288,4 +305,7 @@ DELIMITER ;
 -- 4. JSON 类型字段用于存储结构化的配置数据
 -- 5. TIMESTAMP 类型用于时间记录，自动处理时区转换
 -- 6. 数据清理事件默认启用，可根据实际需求调整执行频率
--- 7. Redis 中的数据结构（会话、缓存、速率限制等）请参考 docs/database.md
+-- 7. 共 11 张表：users, clients, authorization_codes, access_tokens, refresh_tokens,
+--    oidc_sessions, user_consents, social_connections, user_credentials,
+--    user_activity_log, user_totp
+-- 8. Redis 中的数据结构（会话、缓存、速率限制等）请参考 docs/database.md
