@@ -9,6 +9,7 @@ const { storeOAuthState, getAllProviders } = require('../services/social/Provide
 const { authenticate } = require('../middleware/auth');
 const { log, ACTION } = require('../services/ActivityLogService');
 const { generateTokens } = require('../services/TokenService');
+const { getRedisClient } = require('../database/redis');
 const config = require('../config');
 
 const router = express.Router();
@@ -140,12 +141,57 @@ router.get('/social/:provider/callback', async (req, res) => {
       picture: user.picture,
       role: user.role || 'user'
     };
-    const redirectUrl = `${frontendBase}/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&id_token=${encodeURIComponent(tokens.idToken)}&expires_in=${config.jwt.expiresIn}&user=${encodeURIComponent(JSON.stringify(userData))}#/callback`;
-    console.log(`[Social] Redirecting to frontend callback with tokens`);
+
+    const code = crypto.randomBytes(16).toString('hex');
+    const redis = getRedisClient();
+    await redis.set(
+      `social:code:${code}`,
+      JSON.stringify({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        idToken: tokens.idToken,
+        expiresIn: config.jwt.expiresIn,
+        user: userData
+      }),
+      'PX',
+      60000
+    );
+
+    const redirectUrl = `${frontendBase}/?code=${code}#/callback`;
+    console.log(`[Social] Redirecting to frontend callback with auth code`);
     res.redirect(redirectUrl);
   } catch (err) {
     console.error(`[Social] ${req.params.provider} callback error:`, err.message);
     res.status(401).json({ error: 'social_login_failed', message: err.message || '第三方登录失败' });
+  }
+});
+
+router.post('/social/callback/exchange', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'invalid_request', message: '缺少 code' });
+    }
+
+    const redis = getRedisClient();
+    const stored = await redis.get(`social:code:${code}`);
+    if (!stored) {
+      return res.status(400).json({ error: 'invalid_grant', message: 'code 无效或已过期' });
+    }
+
+    await redis.del(`social:code:${code}`);
+
+    const tokenData = JSON.parse(stored);
+    res.json({
+      access_token: tokenData.accessToken,
+      refresh_token: tokenData.refreshToken,
+      id_token: tokenData.idToken,
+      expires_in: tokenData.expiresIn,
+      user: tokenData.user
+    });
+  } catch (err) {
+    console.error('[Social] Code exchange error:', err);
+    res.status(500).json({ error: 'server_error', message: '令牌交换失败' });
   }
 });
 

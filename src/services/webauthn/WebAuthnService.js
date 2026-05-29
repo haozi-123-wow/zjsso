@@ -377,7 +377,10 @@ async function verifyAuthentication(credential) {
   }
 
   const expectedChallenge = await getAndClearChallenge(storedCred.user_id);
-  if (expectedChallenge && clientData.challenge !== expectedChallenge) {
+  if (!expectedChallenge) {
+    throw new Error('挑战码不存在或已过期，请重新开始');
+  }
+  if (clientData.challenge !== expectedChallenge) {
     throw new Error('挑战码不匹配');
   }
 

@@ -28,16 +28,16 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
     const { client_id, redirect_uri, response_type, scope, state, nonce, code_challenge, code_challenge_method, prompt, access_token: queryToken } = req.query;
 
     if (!client_id || !redirect_uri || !response_type || !scope) {
-      return res.redirect(createErrorRedirect(redirect_uri, 'invalid_request', '缺少必要参数', state));
+      return res.status(400).json({ error: 'invalid_request', error_description: '缺少必要参数' });
     }
 
     const client = await authService.getClientByClientId(client_id);
     if (!client) {
-      return res.redirect(createErrorRedirect(redirect_uri, 'invalid_client', '客户端不存在或已禁用', state));
+      return res.status(400).json({ error: 'invalid_client', error_description: '客户端不存在或已禁用' });
     }
 
     if (!authService.validateRedirectUri(client, redirect_uri)) {
-      return res.redirect(createErrorRedirect(redirect_uri, 'invalid_request', 'redirect_uri 不匹配', state));
+      return res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri 不匹配' });
     }
 
     if (response_type !== 'code') {
@@ -125,11 +125,6 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
     res.redirect(302, redirectUrl.toString());
   } catch (err) {
     console.error('Authorize error:', err);
-    const redirectUri = req.query.redirect_uri;
-    const state = req.query.state;
-    if (redirectUri) {
-      return res.redirect(createErrorRedirect(redirectUri, 'server_error', '服务器内部错误', state));
-    }
     res.status(500).json({ error: 'server_error', error_description: '服务器内部错误' });
   }
 });

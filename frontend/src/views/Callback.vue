@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { setTokens } from '@/utils/api'
+import { API_BASE, setTokens } from '@/utils/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -41,30 +41,43 @@ const loading = ref(true)
 const error = ref('')
 const auth = useAuthStore()
 
-onMounted(() => {
+onMounted(async () => {
   const query = new URLSearchParams(window.location.search)
 
-  // 社交登录回调：携带 access_token 直接登录
-  const accessToken = query.get('access_token')
-  const refreshToken = query.get('refresh_token')
-  const expiresIn = query.get('expires_in')
-  const userJson = query.get('user')
+  // 社交登录回调：携带授权码，通过后端交换令牌
+  const code = query.get('code')
 
-  if (accessToken && expiresIn) {
-    setTokens(accessToken, refreshToken || '', parseInt(expiresIn))
-    if (userJson) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(userJson))
-        auth.user = userData
-        localStorage.setItem('user', JSON.stringify(userData))
-      } catch {}
+  if (code) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/social/callback/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      })
+
+      if (!res.ok) {
+        const errData = await res.json()
+        error.value = errData.message || '令牌交换失败'
+        loading.value = false
+        return
+      }
+
+      const data = await res.json()
+      setTokens(data.access_token, data.refresh_token || '', parseInt(data.expires_in))
+      if (data.user) {
+        auth.user = data.user
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+      window.location.hash = '#/profile'
+      return
+    } catch {
+      error.value = '网络错误，令牌交换失败'
+      loading.value = false
+      return
     }
-    window.location.hash = '#/profile'
-    return
   }
 
   // OIDC 授权码回调
-  const code = query.get('code')
   const state = query.get('state')
   const err = query.get('error')
 
@@ -75,7 +88,7 @@ onMounted(() => {
     return
   }
 
-  if (code) {
+  if (query.get('code')) {
     router.push('/login')
   } else {
     error.value = '缺少授权参数'
