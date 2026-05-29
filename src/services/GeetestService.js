@@ -17,7 +17,7 @@ class GeetestService {
 
   async validate({ lot_number, captcha_output, pass_token, gen_time } = {}) {
     if (!config.geetest.captchaId || !config.geetest.captchaKey) {
-      return { result: 'success', reason: 'geetest not configured' };
+      return { result: 'fail', reason: 'geetest not configured' };
     }
 
     if (!lot_number || !captcha_output || !pass_token || !gen_time) {
@@ -42,15 +42,10 @@ class GeetestService {
         return { result: 'success', reason: result.reason || '' };
       }
 
-      if (result && result.status === 'error') {
-        console.error('Geetest validation error:', result.msg || result.code);
-        return { result: 'success', reason: 'geetest api error, bypassed' };
-      }
-
       return { result: 'fail', reason: (result && result.reason) || 'validation failed' };
     } catch (err) {
       console.error('Geetest request failed:', err.message);
-      return { result: 'success', reason: 'geetest api unreachable, bypassed' };
+      return { result: 'fail', reason: 'geetest api unreachable' };
     }
   }
 

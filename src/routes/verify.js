@@ -13,22 +13,25 @@ const router = express.Router();
 
 function generateTicket(userId, action) {
   const payload = JSON.stringify({ userId, action, ts: Date.now() });
+  const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-cbc',
     crypto.createHash('sha256').update(config.jwt.secret).digest(),
-    Buffer.alloc(16, 0)
+    iv
   );
   let encrypted = cipher.update(payload, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  return iv.toString('hex') + encrypted;
 }
 
 function verifyTicket(token, userId, action) {
   try {
+    const iv = Buffer.from(token.substring(0, 32), 'hex');
+    const encrypted = token.substring(32);
     const decipher = crypto.createDecipheriv('aes-256-cbc',
       crypto.createHash('sha256').update(config.jwt.secret).digest(),
-      Buffer.alloc(16, 0)
+      iv
     );
-    let decrypted = decipher.update(token, 'hex', 'utf8');
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     const data = JSON.parse(decrypted);
     if (Date.now() - data.ts > 300000) return null;
@@ -72,7 +75,7 @@ router.post('/verify/send-email', authenticate, async (req, res) => {
     if (!user || !user.email || user.email.endsWith('@social.local')) {
       return res.status(400).json({ error: 'invalid_request', message: '您暂未配置有效的邮箱，请先绑定邮箱' });
     }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
     await emailService.storeCode(user.email, code, 'verification', 600);
     await emailService.sendVerificationEmail(user.email, code);
     res.json({ sent: true });

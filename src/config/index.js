@@ -1,5 +1,15 @@
 require('dotenv').config();
 
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET 环境变量未设置。\n' +
+    '请设置一个强随机密钥。可以通过以下命令生成：\n' +
+    '  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n' +
+    '然后在 .env 文件中添加：\n' +
+    '  JWT_SECRET=你生成的密钥'
+  );
+}
+
 module.exports = {
   app: {
     port: parseInt(process.env.APP_PORT) || 3000,
@@ -20,13 +30,13 @@ module.exports = {
     password: process.env.REDIS_PASSWORD || undefined
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'default-jwt-secret',
+    secret: process.env.JWT_SECRET,
     expiresIn: parseInt(process.env.JWT_EXPIRES_IN) || 3600,
     refreshExpiresIn: parseInt(process.env.REFRESH_TOKEN_EXPIRES_IN) || 604800
   },
   session: {
     mode: process.env.SESSION_MODE || 'stateless',
-    secret: process.env.SESSION_SECRET || 'default-session-secret',
+    secret: process.env.SESSION_SECRET,
     expiresIn: parseInt(process.env.SESSION_EXPIRES_IN) || 86400
   },
   geetest: {
