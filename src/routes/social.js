@@ -142,10 +142,10 @@ router.get('/social/:provider/callback', async (req, res) => {
       role: user.role || 'user'
     };
 
-    const code = crypto.randomBytes(16).toString('hex');
+    const exchangeCode = crypto.randomBytes(16).toString('hex');
     const redis = getRedisClient();
     await redis.set(
-      `social:code:${code}`,
+      `social:code:${exchangeCode}`,
       JSON.stringify({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -157,7 +157,7 @@ router.get('/social/:provider/callback', async (req, res) => {
       60000
     );
 
-    const redirectUrl = `${frontendBase}/?code=${code}#/callback`;
+    const redirectUrl = `${frontendBase}/?code=${exchangeCode}#/callback`;
     console.log(`[Social] Redirecting to frontend callback with auth code`);
     res.redirect(redirectUrl);
   } catch (err) {
