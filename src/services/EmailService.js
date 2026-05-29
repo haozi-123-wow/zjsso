@@ -69,9 +69,10 @@ class EmailService {
 
   async storeCode(email, code, type, ttlSeconds = 3600) {
     const client = getRedisClient();
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     await client.set(
       `email:code:${email}`,
-      JSON.stringify({ code, type, expires_at: Math.floor(Date.now() / 1000) + ttlSeconds }),
+      JSON.stringify({ codeHash, type, expires_at: Math.floor(Date.now() / 1000) + ttlSeconds }),
       'PX',
       ttlSeconds * 1000
     );
@@ -87,7 +88,8 @@ class EmailService {
 
     try {
       const parsed = JSON.parse(data);
-      if (parsed.code !== code) {
+      const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+      if (parsed.codeHash !== codeHash) {
         return { valid: false, reason: '验证码不正确' };
       }
       if (parsed.type !== type) {
@@ -310,7 +312,12 @@ class EmailService {
   }
 
   generateCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars[crypto.randomInt(0, 36)];
+    }
+    return code;
   }
 }
 
