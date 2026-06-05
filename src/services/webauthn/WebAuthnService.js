@@ -376,7 +376,8 @@ async function verifyAuthentication(credential) {
     throw new Error('clientDataJSON 解析失败');
   }
 
-  const expectedChallenge = await getAndClearChallenge(storedCred.user_id);
+  const redis = getRedisClient();
+  const expectedChallenge = await redis.get(`webauthn:challenge:${storedCred.user_id}`);
   if (!expectedChallenge) {
     throw new Error('挑战码不存在或已过期，请重新开始');
   }
@@ -475,6 +476,8 @@ async function verifyAuthentication(credential) {
   if (!valid) {
     throw new Error('签名不匹配');
   }
+
+  await redis.del(`webauthn:challenge:${storedCred.user_id}`);
 
   await db.query(
     'UPDATE user_credentials SET counter = ?, last_used_at = NOW() WHERE id = ?',
