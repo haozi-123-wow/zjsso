@@ -315,7 +315,7 @@ function getCBORIntSize(buf, offset) {
   return 1;
 }
 
-async function generateAuthenticationOptions(username) {
+async function generateAuthenticationOptions(username, sessionToken) {
   let user = null;
   if (username) {
     const users = await db.query(
@@ -343,6 +343,14 @@ async function generateAuthenticationOptions(username) {
           ? (typeof c.transports === 'string' ? JSON.parse(c.transports) : c.transports)
           : []
       }));
+  } else if (sessionToken) {
+    const redis = getRedisClient();
+    await redis.set(
+      `webauthn:challenge:session:${sessionToken}`,
+      challenge,
+      'PX',
+      60000
+    );
   }
 
   return {
@@ -377,7 +385,10 @@ async function verifyAuthentication(credential) {
   }
 
   const redis = getRedisClient();
-  const expectedChallenge = await redis.get(`webauthn:challenge:${storedCred.user_id}`);
+  let expectedChallenge = await redis.get(`webauthn:challenge:${storedCred.user_id}`);
+  if (!expectedChallenge && credential.session_id) {
+    expectedChallenge = await redis.get(`webauthn:challenge:session:${credential.session_id}`);
+  }
   if (!expectedChallenge) {
     throw new Error('挑战码不存在或已过期，请重新开始');
   }
@@ -478,6 +489,9 @@ async function verifyAuthentication(credential) {
   }
 
   await redis.del(`webauthn:challenge:${storedCred.user_id}`);
+  if (credential.session_id) {
+    await redis.del(`webauthn:challenge:session:${credential.session_id}`);
+  }
 
   await db.query(
     'UPDATE user_credentials SET counter = ?, last_used_at = NOW() WHERE id = ?',

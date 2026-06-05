@@ -69,8 +69,16 @@ router.post('/register/complete', authenticate, async (req, res) => {
 router.post('/login/begin', async (req, res) => {
   try {
     const { username } = req.body;
-    const options = await webauthnService.generateAuthenticationOptions(username || null);
-    res.json(options);
+    let session_id;
+    if (!username) {
+      session_id = uuidv4();
+    }
+    const options = await webauthnService.generateAuthenticationOptions(username || null, session_id);
+    const response = { ...options };
+    if (session_id) {
+      response.session_id = session_id;
+    }
+    res.json(response);
   } catch (err) {
     console.error('Login begin error:', err);
     res.status(500).json({ error: 'server_error', message: '生成认证选项失败' });

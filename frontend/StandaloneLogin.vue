@@ -329,6 +329,7 @@ const handlePasskeyLogin = async () => {
     }
     const credential = await navigator.credentials.get({ publicKey })
     const credentialData = {
+      session_id: optionsRes.session_id || options.session_id,
       id: bufferToBase64URL(credential.rawId),
       rawId: bufferToBase64URL(credential.rawId),
       response: {

@@ -355,6 +355,7 @@ async function handleWebAuthnLogin() {
     }
     const cred = await navigator.credentials.get({ publicKey }) as any
     const data = await apiPost('/api/webauthn/login/complete', {
+      session_id: beginData.session_id,
       id: cred.id, rawId: bufferToBase64URL(cred.rawId),
       response: { clientDataJSON: bufferToBase64URL(cred.response.clientDataJSON), authenticatorData: bufferToBase64URL(cred.response.authenticatorData), signature: bufferToBase64URL(cred.response.signature), userHandle: cred.response.userHandle ? bufferToBase64URL(cred.response.userHandle) : null },
       type: cred.type
