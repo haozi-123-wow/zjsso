@@ -330,6 +330,7 @@ async function generateAuthenticationOptions(username, sessionToken) {
 
   if (user) {
     await storeChallenge(user.id, challenge);
+    console.log(`[WebAuthn] Stored challenge by user_id: webauthn:challenge:${user.id}`);
     const creds = await db.query(
       'SELECT credential_id, transports FROM user_credentials WHERE user_id = ?',
       [user.id]
@@ -351,6 +352,9 @@ async function generateAuthenticationOptions(username, sessionToken) {
       'PX',
       60000
     );
+    console.log(`[WebAuthn] Stored challenge by session: webauthn:challenge:session:${sessionToken.substring(0,8)}...`);
+  } else {
+    console.log(`[WebAuthn] WARNING: challenge NOT stored (no user, no sessionToken)`);
   }
 
   return {
@@ -386,8 +390,11 @@ async function verifyAuthentication(credential) {
 
   const redis = getRedisClient();
   let expectedChallenge = await redis.get(`webauthn:challenge:${storedCred.user_id}`);
+  console.log(`[WebAuthn] verifyAuthentication: challenge by user_id webauthn:challenge:${storedCred.user_id} = ${expectedChallenge ? 'found' : 'NOT FOUND'}`);
   if (!expectedChallenge && credential.session_id) {
+    console.log(`[WebAuthn] verifyAuthentication: trying session key webauthn:challenge:session:${credential.session_id.substring(0,8)}...`);
     expectedChallenge = await redis.get(`webauthn:challenge:session:${credential.session_id}`);
+    console.log(`[WebAuthn] verifyAuthentication: challenge by session = ${expectedChallenge ? 'found' : 'NOT FOUND'}`);
   }
   if (!expectedChallenge) {
     throw new Error('挑战码不存在或已过期，请重新开始');

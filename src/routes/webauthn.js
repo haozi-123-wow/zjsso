@@ -73,11 +73,13 @@ router.post('/login/begin', async (req, res) => {
     if (!username) {
       session_id = uuidv4();
     }
+    console.log(`[WebAuthn] /login/begin username=${username}, session_id=${session_id ? session_id.substring(0,8)+'...' : 'none'}`);
     const options = await webauthnService.generateAuthenticationOptions(username || null, session_id);
     const response = { ...options };
     if (session_id) {
       response.session_id = session_id;
     }
+    console.log(`[WebAuthn] /login/begin returning challenge=${options.publicKey.challenge.substring(0,8)}..., session_id=${session_id ? session_id.substring(0,8)+'...' : 'none'}`);
     res.json(response);
   } catch (err) {
     console.error('Login begin error:', err);
@@ -87,6 +89,7 @@ router.post('/login/begin', async (req, res) => {
 
 router.post('/login/complete', async (req, res) => {
   try {
+    console.log(`[WebAuthn] /login/complete credential.id=${(req.body.id || '').substring(0,12)}..., session_id=${req.body.session_id ? req.body.session_id.substring(0,8)+'...' : 'N/A'}`);
     const user = await webauthnService.verifyAuthentication(req.body);
     if (!user) {
       return res.status(401).json({
