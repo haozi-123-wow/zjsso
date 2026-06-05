@@ -348,18 +348,21 @@ async function handleWebAuthnLogin() {
   webauthnLoading.value = true
   try {
     const beginData = await apiPost('/api/webauthn/login/begin', { username: null })
+    console.log(`[WebAuthn FE] /login/begin response: session_id=${beginData.session_id ? beginData.session_id.substring(0,8)+'...' : 'MISSING'}, challenge=${(beginData.publicKey?.challenge || '').substring(0,8)}...`)
     const publicKey = beginData.publicKey
     publicKey.challenge = base64URLToBuffer(publicKey.challenge)
     if (publicKey.allowCredentials) {
       publicKey.allowCredentials = publicKey.allowCredentials.map((c: any) => ({ ...c, id: base64URLToBuffer(c.id) }))
     }
     const cred = await navigator.credentials.get({ publicKey }) as any
-    const data = await apiPost('/api/webauthn/login/complete', {
+    const completeBody = {
       session_id: beginData.session_id,
       id: cred.id, rawId: bufferToBase64URL(cred.rawId),
       response: { clientDataJSON: bufferToBase64URL(cred.response.clientDataJSON), authenticatorData: bufferToBase64URL(cred.response.authenticatorData), signature: bufferToBase64URL(cred.response.signature), userHandle: cred.response.userHandle ? bufferToBase64URL(cred.response.userHandle) : null },
       type: cred.type
-    })
+    }
+    console.log(`[WebAuthn FE] POST /login/complete: session_id=${completeBody.session_id ? completeBody.session_id.substring(0,8)+'...' : 'MISSING'}`)
+    const data = await apiPost('/api/webauthn/login/complete', completeBody)
     if (data.access_token) {
       setTokens(data.access_token, data.refresh_token, data.expires_in)
       localStorage.setItem('user', JSON.stringify(data.user))

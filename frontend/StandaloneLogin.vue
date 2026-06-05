@@ -321,6 +321,7 @@ const handlePasskeyLogin = async () => {
   try {
     passkeyLoading.value = true
     const optionsRes = await apiPost('/webauthn/login/begin', { username: formData.value.username })
+    console.log(`[WebAuthn FE] /login/begin response: session_id=${optionsRes.session_id ? optionsRes.session_id.substring(0,8)+'...' : 'N/A'}, challenge=${((optionsRes.publicKey || optionsRes).challenge || '').substring(0,8)}...`)
     const options = optionsRes.data || optionsRes
     const publicKey = options.publicKey || options
     publicKey.challenge = base64URLToBuffer(publicKey.challenge)
@@ -340,6 +341,7 @@ const handlePasskeyLogin = async () => {
       },
       type: credential.type
     }
+    console.log(`[WebAuthn FE] POST /login/complete: session_id=${credentialData.session_id ? credentialData.session_id.substring(0,8)+'...' : 'MISSING'}`)
     const res = await apiPost('/webauthn/login/complete', credentialData)
     if (res.user_id) {
       localStorage.setItem('token', res.token)
