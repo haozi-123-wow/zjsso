@@ -9,8 +9,17 @@ const { authenticate } = require('../middleware/auth');
 const { log, ACTION } = require('../services/ActivityLogService');
 const { verifyTicket } = require('./verify');
 const { generateTokens } = require('../services/TokenService');
+const { createRateLimiter } = require('../middleware/rateLimiter');
+const { getRedisClient } = require('../database/redis');
 
 const router = express.Router();
+
+// TOTP 登录速率限制器：每个 IP 在 5 分钟内最多 5 次尝试
+const totpLoginLimiter = createRateLimiter({
+  windowSeconds: 300,
+  maxRequests: 5,
+  keyPrefix: 'totp_login'
+});
 
 router.get('/totp/status', authenticate, async (req, res) => {
   try {
@@ -126,7 +135,7 @@ router.post('/totp/disable', authenticate, async (req, res) => {
   }
 });
 
-router.post('/totp/login-check', async (req, res) => {
+router.post('/totp/login-check', totpLoginLimiter, async (req, res) => {
   try {
     const { temp_token, code } = req.body;
     if (!temp_token || !code) {
@@ -136,6 +145,19 @@ router.post('/totp/login-check', async (req, res) => {
     const decrypted = verifyTempToken(temp_token);
     if (!decrypted) {
       return res.status(401).json({ error: 'invalid_grant', message: '令牌已过期或无效，请重新登录' });
+    }
+
+    // 检查该 temp_token 的失败尝试次数
+    const redis = getRedisClient();
+    const failKey = `totp_fail:${temp_token}`;
+    const failCount = parseInt(await redis.get(failKey) || '0', 10);
+    
+    // 最多允许 3 次失败尝试
+    if (failCount >= 3) {
+      return res.status(429).json({ 
+        error: 'too_many_attempts', 
+        message: '验证尝试次数过多，请重新登录' 
+      });
     }
 
     const rows = await db.query('SELECT * FROM user_totp WHERE user_id = ?', [decrypted.userId]);
@@ -151,8 +173,18 @@ router.post('/totp/login-check', async (req, res) => {
     });
 
     if (!verified) {
-      return res.status(400).json({ error: 'invalid_grant', message: '验证码错误' });
+      // 记录失败尝试，5 分钟过期（与 temp_token TTL 一致）
+      await redis.set(failKey, failCount + 1, 'EX', 300);
+      
+      const remaining = 2 - failCount;
+      return res.status(400).json({ 
+        error: 'invalid_grant', 
+        message: `验证码错误，剩余 ${Math.max(0, remaining)} 次尝试机会` 
+      });
     }
+
+    // 验证成功，清除失败计数
+    await redis.del(failKey);
 
     const userRows = await db.query('SELECT * FROM users WHERE id = ?', [decrypted.userId]);
     if (userRows.length === 0) {
