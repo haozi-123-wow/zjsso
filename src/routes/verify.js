@@ -6,13 +6,14 @@ const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const emailService = require('../services/EmailService');
 const { log, ACTION } = require('../services/ActivityLogService');
+const { getRedisClient } = require('../database/redis');
 const speakeasy = require('speakeasy');
 const webauthnService = require('../services/webauthn/WebAuthnService');
 
 const router = express.Router();
 
 function generateTicket(userId, action) {
-  const payload = JSON.stringify({ userId, action, ts: Date.now() });
+  const payload = JSON.stringify({ userId, action, ts: Date.now(), jti: uuidv4() });
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-cbc',
     crypto.createHash('sha256').update(config.jwt.secret).digest(),
@@ -23,7 +24,7 @@ function generateTicket(userId, action) {
   return iv.toString('hex') + encrypted;
 }
 
-function verifyTicket(token, userId, action) {
+async function verifyTicket(token, userId, action, { consume = false } = {}) {
   try {
     const iv = Buffer.from(token.substring(0, 32), 'hex');
     const encrypted = token.substring(32);
@@ -37,6 +38,16 @@ function verifyTicket(token, userId, action) {
     if (Date.now() - data.ts > 300000) return null;
     if (data.userId !== userId) return null;
     if (data.action !== action) return null;
+
+    if (consume && data.jti) {
+      const redis = getRedisClient();
+      const usedKey = `ticket_used:${data.jti}`;
+      const alreadyUsed = await redis.get(usedKey);
+      if (alreadyUsed) return null;
+      const remaining = Math.max(1, Math.ceil((300000 - (Date.now() - data.ts)) / 1000));
+      await redis.set(usedKey, '1', 'EX', remaining);
+    }
+
     return data;
   } catch { return null; }
 }
@@ -139,7 +150,7 @@ router.put('/profile', authenticate, async (req, res) => {
       if (!ticket) {
         return res.status(400).json({ error: 'invalid_request', message: '修改邮箱需先完成安全验证' });
       }
-      const ticketData = verifyTicket(ticket, req.user.id, 'change_email');
+      const ticketData = await verifyTicket(ticket, req.user.id, 'change_email', { consume: true });
       if (!ticketData) {
         return res.status(400).json({ error: 'invalid_request', message: '验证凭据无效或已过期' });
       }

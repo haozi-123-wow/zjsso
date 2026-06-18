@@ -117,7 +117,7 @@ router.post('/totp/disable', authenticate, async (req, res) => {
         window: 1
       });
     } else if (ticket) {
-      verified = !!verifyTicket(ticket, req.user.id, 'disable_2fa');
+      verified = !!(await verifyTicket(ticket, req.user.id, 'disable_2fa', { consume: true }));
     }
 
     if (!verified) {

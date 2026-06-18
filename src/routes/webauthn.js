@@ -44,7 +44,7 @@ router.post('/register/begin', authenticate, async (req, res) => {
 router.post('/register/complete', authenticate, async (req, res) => {
   try {
     const { ticket } = req.body;
-    if (!ticket || !verifyTicket(ticket, req.user.id, 'register_passkey')) {
+    if (!ticket || !(await verifyTicket(ticket, req.user.id, 'register_passkey', { consume: true }))) {
       return res.status(400).json({ error: 'invalid_request', message: '请先完成安全验证' });
     }
 
@@ -188,7 +188,7 @@ router.post('/login/complete', async (req, res) => {
 router.delete('/credentials/:credentialId', authenticate, async (req, res) => {
   try {
     const ticket = req.headers['x-verify-ticket'];
-    if (!ticket || !verifyTicket(ticket, req.user.id, 'delete_passkey')) {
+    if (!ticket || !(await verifyTicket(ticket, req.user.id, 'delete_passkey', { consume: true }))) {
       return res.status(400).json({ error: 'invalid_request', message: '请先完成安全验证' });
     }
     const deleted = await webauthnService.deleteCredential(req.user.id, req.params.credentialId);
