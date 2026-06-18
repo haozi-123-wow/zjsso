@@ -221,22 +221,25 @@ router.post('/totp/login-check', totpLoginLimiter, async (req, res) => {
 
 function generateTempToken(userId) {
   const payload = JSON.stringify({ userId, ts: Date.now() });
+  const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-cbc',
     crypto.createHash('sha256').update(config.jwt.secret).digest(),
-    Buffer.alloc(16, 0)
+    iv
   );
   let encrypted = cipher.update(payload, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  return encrypted;
+  return iv.toString('hex') + encrypted;
 }
 
 function verifyTempToken(token) {
   try {
+    const iv = Buffer.from(token.substring(0, 32), 'hex');
+    const encrypted = token.substring(32);
     const decipher = crypto.createDecipheriv('aes-256-cbc',
       crypto.createHash('sha256').update(config.jwt.secret).digest(),
-      Buffer.alloc(16, 0)
+      iv
     );
-    let decrypted = decipher.update(token, 'hex', 'utf8');
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     const data = JSON.parse(decrypted);
     if (Date.now() - data.ts > 300000) return null;
