@@ -55,6 +55,7 @@ class SocialProvider {
       provider_user_id: profile.id,
       provider_username: profile.username,
       provider_email: profile.email,
+      provider_email_verified: !!profile.email_verified,
       provider_avatar: profile.avatar,
       display_name: profile.display_name,
       access_token: tokenData.access_token,

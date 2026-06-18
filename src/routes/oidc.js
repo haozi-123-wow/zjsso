@@ -180,13 +180,19 @@ async function handleAuthorizationCodeGrant(req, res) {
     return res.status(401).json({ error: 'invalid_client', error_description: '客户端认证失败' });
   }
 
-  if (redirect_uri && !authService.validateRedirectUri(client, redirect_uri)) {
-    return res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri 不匹配' });
-  }
-
   const authCodeData = await authService.consumeAuthorizationCode(code, client.id, code_verifier || null);
   if (!authCodeData) {
     return res.status(400).json({ error: 'invalid_grant', error_description: '授权码无效、已过期或已被使用' });
+  }
+
+  // 强制 redirect_uri 绑定：授权码创建时若存储了 redirect_uri，则令牌请求必须携带且值一致
+  if (authCodeData.redirectUri) {
+    if (!redirect_uri) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: '缺少 redirect_uri' });
+    }
+    if (redirect_uri !== authCodeData.redirectUri) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri 不匹配' });
+    }
   }
 
   const users = await db.query('SELECT * FROM users WHERE id = ? AND enabled = TRUE', [authCodeData.userId]);

@@ -58,28 +58,44 @@ class GitHubProvider extends SocialProvider {
     });
     console.log(`[GitHub] User profile received in ${Date.now() - profileStart}ms, id=${userData.id}, login=${userData.login}`);
 
-    let email = userData.email;
-    if (!email) {
-      console.log(`[GitHub] No public email, fetching emails list...`);
-      const emailStart = Date.now();
-      const emails = await this._httpsRequest('https://api.github.com/user/emails', {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'User-Agent': 'ZJSSO/1.0'
+    // 始终通过 /user/emails 获取已验证的邮箱，不直接信任公开资料中的 email
+    let email = null;
+    let emailVerified = false;
+
+    console.log(`[GitHub] Fetching emails list to verify ownership...`);
+    const emailStart = Date.now();
+    const emails = await this._httpsRequest('https://api.github.com/user/emails', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+        'User-Agent': 'ZJSSO/1.0'
+      }
+    });
+    console.log(`[GitHub] Emails received in ${Date.now() - emailStart}ms, count=${Array.isArray(emails) ? emails.length : 'invalid'}`);
+
+    if (Array.isArray(emails)) {
+      // 优先使用已验证的主邮箱
+      const primaryVerified = emails.find(e => e.primary && e.verified);
+      if (primaryVerified) {
+        email = primaryVerified.email;
+        emailVerified = true;
+      } else {
+        // 其次使用任意已验证的邮箱
+        const anyVerified = emails.find(e => e.verified);
+        if (anyVerified) {
+          email = anyVerified.email;
+          emailVerified = true;
         }
-      });
-      console.log(`[GitHub] Emails received in ${Date.now() - emailStart}ms, count=${Array.isArray(emails) ? emails.length : 'invalid'}`);
-      const primary = Array.isArray(emails) ? emails.find(e => e.primary && e.verified) : null;
-      email = primary ? primary.email : null;
-      console.log(`[GitHub] Primary verified email: ${email || 'none'}`);
+      }
     }
+    console.log(`[GitHub] Verified email: ${email || 'none'}`);
 
     return {
       id: String(userData.id),
       username: userData.login,
       display_name: userData.name || userData.login,
       email: email,
+      email_verified: emailVerified,
       avatar: userData.avatar_url
     };
   }

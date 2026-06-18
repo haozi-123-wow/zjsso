@@ -28,7 +28,8 @@ class User {
 
     if (rows[0]) return rows[0];
 
-    const existingUser = socialData.email ? await this.findByEmail(socialData.email) : null;
+    const existingUser = (socialData.email && socialData.provider_email_verified)
+      ? await this.findByEmail(socialData.email) : null;
 
     if (existingUser) {
       await db.query(
@@ -49,7 +50,7 @@ class User {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [userId, username, socialData.email || `${username}@social.local`,
        socialData.display_name || socialData.provider_username,
-       socialData.provider_avatar, !!socialData.email, true, 'user']
+       socialData.provider_avatar, !!socialData.provider_email_verified, true, 'user']
     );
 
     await db.query(
