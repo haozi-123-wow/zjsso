@@ -25,7 +25,7 @@ const authorizeLimiter = createRateLimiter({
 
 router.get('/authorize', authorizeLimiter, async (req, res) => {
   try {
-    const { client_id, redirect_uri, response_type, scope, state, nonce, code_challenge, code_challenge_method, prompt, access_token: queryToken } = req.query;
+    const { client_id, redirect_uri, response_type, scope, state, nonce, code_challenge, code_challenge_method, prompt, token_session } = req.query;
 
     if (!client_id || !redirect_uri || !response_type || !scope) {
       return res.status(400).json({ error: 'invalid_request', error_description: '缺少必要参数' });
@@ -63,7 +63,16 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
     }
 
     const authHeader = req.headers.authorization;
-    const bearerToken = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null) || queryToken || null;
+    let bearerToken = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null) || null;
+
+    if (!bearerToken && token_session) {
+      const redis = getRedisClient();
+      const resolvedToken = await redis.get(`token_session:${token_session}`);
+      if (resolvedToken) {
+        bearerToken = resolvedToken;
+        await redis.del(`token_session:${token_session}`);
+      }
+    }
 
     if (!bearerToken) {
       if (prompt === 'none') {

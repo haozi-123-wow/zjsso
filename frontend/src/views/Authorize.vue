@@ -151,7 +151,20 @@ async function approve() {
     state: params.value.state || Math.random().toString(36).substring(2)
   })
 
-  window.location.href = `${API_BASE}/oauth/authorize?${queryParams}&access_token=${token}`
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/token-session`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    if (res.ok) {
+      const { token_session } = await res.json()
+      window.location.href = `${API_BASE}/oauth/authorize?${queryParams}&token_session=${token_session}`
+    } else {
+      window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
+    }
+  } catch {
+    window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
+  }
 }
 
 function deny() {

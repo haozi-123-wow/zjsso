@@ -486,4 +486,25 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// 生成短期 token_session，用于安全地将 access_token 从 URL 查询参数中移除
+router.post('/token-session', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'unauthorized', message: '缺少有效的 Authorization 头部' });
+    }
+
+    const accessToken = authHeader.substring(7);
+    const sessionToken = crypto.randomBytes(20).toString('hex');
+
+    const redis = getRedisClient();
+    await redis.set(`token_session:${sessionToken}`, accessToken, 'EX', 60);
+
+    res.json({ token_session: sessionToken });
+  } catch (err) {
+    console.error('Token session error:', err);
+    res.status(500).json({ error: 'server_error', message: '生成会话令牌失败' });
+  }
+});
+
 module.exports = router;
