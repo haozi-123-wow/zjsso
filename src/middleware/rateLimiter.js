@@ -28,7 +28,11 @@ function createRateLimiter({ windowSeconds, maxRequests, keyPrefix }) {
       next();
     } catch (err) {
       console.error('Rate limiter error:', err);
-      next();
+      return res.status(503).json({
+        error: 'service_unavailable',
+        message: '服务暂时不可用，请稍后再试',
+        statusCode: 503
+      });
     }
   };
 }
@@ -75,7 +79,11 @@ function createEmailRateLimiter() {
       next();
     } catch (err) {
       console.error('Email rate limiter error:', err);
-      next();
+      return res.status(503).json({
+        error: 'service_unavailable',
+        message: '服务暂时不可用，请稍后再试',
+        statusCode: 503
+      });
     }
   };
 }
