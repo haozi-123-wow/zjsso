@@ -11,6 +11,7 @@ const { verifyTicket } = require('./verify');
 const { generateTokens } = require('../services/TokenService');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 const { getRedisClient } = require('../database/redis');
+const { setRefreshTokenCookie } = require('../utils/cookie');
 
 const router = express.Router();
 
@@ -196,12 +197,13 @@ router.post('/totp/login-check', totpLoginLimiter, async (req, res) => {
 
     log(user.id, ACTION.LOGIN, { method: 'totp', security_notice: false }, req);
 
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
     res.json({
       verified: true,
       access_token: tokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
-      refresh_token: tokens.refreshToken,
       id_token: tokens.idToken,
       user: {
         id: user.id,

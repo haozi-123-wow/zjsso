@@ -327,7 +327,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost, clearTokens, API_BASE } from '@/utils/api'
+import { apiGet, apiPost, clearTokens, API_BASE, getAccessToken } from '@/utils/api'
 
 const auth = useAuthStore()
 const profileTab = ref('overview')
@@ -495,7 +495,8 @@ async function setupTotp() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/totp/setup`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+        credentials: 'include'
       })
       const data = await res.json()
       if (data.secret) {
@@ -514,8 +515,9 @@ async function confirmTotp() {
   try {
     const res = await fetch(`${API_BASE}/api/auth/totp/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ code: totpVerifyCode.value })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ code: totpVerifyCode.value }),
+      credentials: 'include'
     })
     const data = await res.json()
     if (data.enabled) {
@@ -536,8 +538,9 @@ async function disableTotp() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/totp/disable`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-        body: JSON.stringify({ ticket })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+        body: JSON.stringify({ ticket }),
+        credentials: 'include'
       })
       const data = await res.json()
       if (!data.enabled) {
@@ -578,7 +581,8 @@ async function startVerify(action: string, callback: (ticket: string) => void) {
   verifyTicket.value = ''
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify/methods`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     const data = await res.json()
     verifyMethods.value = data.methods || []
@@ -608,7 +612,8 @@ async function sendVerifyEmail() {
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify/send-email`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     const data = await res.json()
     if (!data.sent) { verifyError.value = data.message || '发送失败' }
@@ -623,8 +628,9 @@ async function submitVerify() {
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ method: verifyMethod.value, code: verifyCode.value, action: verifyPendingAction.value })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ method: verifyMethod.value, code: verifyCode.value, action: verifyPendingAction.value }),
+      credentials: 'include'
     })
     const data = await res.json()
     if (data.verified && data.ticket) {
@@ -654,7 +660,7 @@ async function verifyWithPasskey() {
     const cred = await navigator.credentials.get({ publicKey }) as any
     const verifyRes = await fetch(`${API_BASE}/api/auth/verify/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
       body: JSON.stringify({
         method: 'passkey',
         code: JSON.stringify({
@@ -669,7 +675,8 @@ async function verifyWithPasskey() {
           type: cred.type
         }),
         action: verifyPendingAction.value
-      })
+      }),
+      credentials: 'include'
     })
     const data = await verifyRes.json()
     if (data.verified && data.ticket) {
@@ -713,7 +720,8 @@ async function saveProfile() {
     if (!editEmailVerified.value) {
       try {
         const res = await fetch(`${API_BASE}/api/auth/verify/methods`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+          headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+          credentials: 'include'
         })
         const data = await res.json()
         verifyMethods.value = data.methods || []
@@ -752,7 +760,8 @@ async function sendEditVerifyEmail() {
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify/send-email`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     const data = await res.json()
     if (!data.sent) { editVerifyError.value = data.message || '发送失败' }
@@ -768,8 +777,9 @@ async function submitEditVerify() {
   try {
     const res = await fetch(`${API_BASE}/api/auth/verify/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ method, code: editVerifyCode.value, action: 'change_email' })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ method, code: editVerifyCode.value, action: 'change_email' }),
+      credentials: 'include'
     })
     const data = await res.json()
     if (data.verified && data.ticket) {
@@ -799,7 +809,7 @@ async function verifyEditWithPasskey() {
     const cred = await navigator.credentials.get({ publicKey }) as any
     const verifyRes = await fetch(`${API_BASE}/api/auth/verify/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
       body: JSON.stringify({
         method: 'passkey',
         code: JSON.stringify({
@@ -813,7 +823,8 @@ async function verifyEditWithPasskey() {
           type: cred.type
         }),
         action: 'change_email'
-      })
+      }),
+      credentials: 'include'
     })
     const data = await verifyRes.json()
     if (data.verified && data.ticket) {
@@ -836,8 +847,9 @@ async function doSaveProfile(ticket: string, data: any) {
   try {
     const res = await fetch(`${API_BASE}/api/auth/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ ...data, ticket })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ ...data, ticket }),
+      credentials: 'include'
     })
     const result = await res.json()
     if (result.user) {
@@ -870,7 +882,8 @@ async function handleAvatarChange(e: Event) {
   uploadingAvatar.value = true
   try {
     const sigRes = await fetch(`${API_BASE}/api/upload/avatar-signature?filename=${encodeURIComponent(file.name)}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     if (!sigRes.ok) { const d = await sigRes.json(); alert(d.message || '获取签名失败'); return }
     const sigData = await sigRes.json()
@@ -879,15 +892,16 @@ async function handleAvatarChange(e: Event) {
       Object.entries(sigData.formData).forEach(([k, v]) => fd.append(k, v as string))
     }
     fd.append('file', file)
-    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd })
+    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd, credentials: 'include' })
     if (!uploadRes.ok) { alert('上传到 COS 失败'); return }
     const confirmRes = await fetch(`${API_BASE}/api/upload/avatar-confirm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        'Authorization': `Bearer ${getAccessToken()}`
       },
-      body: JSON.stringify({ key: sigData.key })
+      body: JSON.stringify({ key: sigData.key }),
+      credentials: 'include'
     })
     if (!confirmRes.ok) { alert('确认上传失败'); return }
     const confirmData = await confirmRes.json()
@@ -944,7 +958,8 @@ async function deleteCredential(credId: string) {
     try {
       await fetch(`${API_BASE}/api/webauthn/credentials/${credId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}`, 'x-verify-ticket': ticket }
+        headers: { 'Authorization': `Bearer ${getAccessToken()}`, 'x-verify-ticket': ticket },
+        credentials: 'include'
       })
       credentials.value = credentials.value.filter(c => c.id !== credId)
     } catch { alert('删除失败') }
@@ -956,7 +971,8 @@ async function unbindSocial(connId: string) {
   try {
     await fetch(`${API_BASE}/api/user/social/connections/${connId}`, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     socialConnections.value = socialConnections.value.filter(c => c.id !== connId)
   } catch { alert('解绑失败') }
@@ -966,7 +982,8 @@ async function bindSocial(provider: string) {
   bindLoading.value = provider
   try {
     const res = await fetch(`${API_BASE}/api/auth/social/${provider}/bind`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     const data = await res.json()
     if (data.redirect_url) {
@@ -981,7 +998,8 @@ async function revokeConsent(item: any) {
   try {
     await fetch(`${API_BASE}/api/auth/user/consents/${item.client_id}`, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     consents.value = consents.value.filter(c => c.id !== item.id)
   } catch { alert('撤销授权失败') }

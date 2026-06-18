@@ -6,7 +6,7 @@ import Profile from '@/views/Profile.vue'
 import Admin from '@/views/Admin.vue'
 import Activation from '@/views/Activation.vue'
 import NotFound from '@/views/NotFound.vue'
-import { loadTokens, getAccessToken } from '@/utils/api'
+import { getAccessToken, restoreSession } from '@/utils/api'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
@@ -24,12 +24,14 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth) {
-    loadTokens()
     if (!getAccessToken()) {
-      next({ name: 'login', query: { redirect: to.fullPath } })
-      return
+      const restored = await restoreSession()
+      if (!restored) {
+        next({ name: 'login', query: { redirect: to.fullPath } })
+        return
+      }
     }
   }
   next()

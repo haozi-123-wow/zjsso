@@ -148,7 +148,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getAccessToken, loadTokens, setTokens, apiPost, apiGet } from '@/utils/api'
+import { getAccessToken, setTokens, apiPost, apiGet, restoreSession } from '@/utils/api'
 import { API_BASE } from '@/utils/api'
 
 declare function initGeetest4(config: { captchaId: string; product?: string }, callback: (captcha: any) => void): void
@@ -390,9 +390,17 @@ function base64URLToBuffer(base64url: string) {
   return bytes.buffer
 }
 
-onMounted(() => {
-  loadTokens()
+onMounted(async () => {
   if (getAccessToken()) {
+    const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+    const redirect = params.get('redirect') || '#/profile'
+    redirecting.value = true
+    setTimeout(() => { window.location.hash = redirect }, 300)
+    return
+  }
+  const restored = await restoreSession()
+  if (restored) {
+    auth.loadUser()
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
     const redirect = params.get('redirect') || '#/profile'
     redirecting.value = true

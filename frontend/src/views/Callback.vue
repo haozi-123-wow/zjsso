@@ -63,7 +63,7 @@ onMounted(async () => {
       }
 
       const data = await res.json()
-      setTokens(data.access_token, data.refresh_token || '', parseInt(data.expires_in))
+      setTokens(data.access_token, '', parseInt(data.expires_in))
       if (data.user) {
         auth.user = data.user
         localStorage.setItem('user', JSON.stringify(data.user))

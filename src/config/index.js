@@ -15,7 +15,11 @@ module.exports = {
     port: parseInt(process.env.APP_PORT) || 3000,
     host: process.env.APP_HOST || 'localhost',
     issuer: process.env.ISSUER || 'http://localhost:3000',
-    frontendUrl: process.env.FRONTEND_URL || process.env.ISSUER || 'http://localhost:6873'
+    frontendUrl: process.env.FRONTEND_URL || process.env.ISSUER || 'http://localhost:6873',
+    frontendUrls: [
+      process.env.FRONTEND_URL || process.env.ISSUER || 'http://localhost:6873',
+      ...(process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(',').map(s => s.trim()) : []),
+    ],
   },
   database: {
     host: process.env.DB_HOST || 'localhost',

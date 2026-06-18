@@ -73,7 +73,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getAccessToken, loadTokens } from '@/utils/api'
+import { getAccessToken, restoreSession } from '@/utils/api'
 import { API_BASE } from '@/utils/api'
 
 const router = useRouter()
@@ -97,10 +97,12 @@ const scopes = computed(() => {
 })
 
 onMounted(async () => {
-  loadTokens()
   if (!getAccessToken()) {
-    window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
-    return
+    const restored = await restoreSession()
+    if (!restored) {
+      window.location.href = `/#/login?redirect=${encodeURIComponent(window.location.hash)}`
+      return
+    }
   }
 
   const hash = window.location.hash.split('?')
@@ -110,7 +112,7 @@ onMounted(async () => {
 
   if (params.value.client_id) {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/client-info?client_id=${params.value.client_id}`)
+      const res = await fetch(`${API_BASE}/api/auth/client-info?client_id=${params.value.client_id}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         client.value = data

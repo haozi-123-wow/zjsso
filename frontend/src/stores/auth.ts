@@ -1,16 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loadTokens, clearTokens, setTokens, apiGet, apiPost, API_BASE } from '@/utils/api'
+import { clearTokens, setTokens, apiGet, apiPost, API_BASE, restoreSession } from '@/utils/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<any>(null)
   const isLoggedIn = computed(() => !!user.value)
 
   function loadUser() {
-    loadTokens()
     const stored = localStorage.getItem('user')
     if (stored) {
       try { user.value = JSON.parse(stored) } catch { user.value = null }
+    }
+  }
+
+  async function initSession() {
+    loadUser()
+    if (user.value) {
+      const ok = await restoreSession()
+      if (!ok) {
+        user.value = null
+        localStorage.removeItem('user')
+      }
     }
   }
 
@@ -19,7 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (geetest) Object.assign(body, geetest)
     const data = await apiPost('/api/auth/login', body)
     if (data.access_token) {
-      setTokens(data.access_token, data.refresh_token, data.expires_in)
+      setTokens(data.access_token, '', data.expires_in)
       user.value = data.user
       localStorage.setItem('user', JSON.stringify(data.user))
     }
@@ -33,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await apiPost('/api/auth/logout', { refresh_token: localStorage.getItem('refresh_token') })
+    await apiPost('/api/auth/logout')
     clearTokens()
     user.value = null
   }
@@ -73,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
     return apiPost('/api/email/reset-password', { email, reset_code: resetCode, new_password: newPassword, confirm_password: newPassword })
   }
 
-  loadUser()
+  initSession()
 
   return { user, isLoggedIn, login, register, logout, fetchUserInfo, loadUser, sendActivationEmail, sendResetPasswordEmail, verifyActivation, resetPassword }
 })

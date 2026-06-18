@@ -14,6 +14,7 @@ const { getIpLocation, getClientIp } = require('../services/IpLocationService');
 const { log, ACTION } = require('../services/ActivityLogService');
 const { generateTempToken } = require('./totp');
 const { generateTokens } = require('../services/TokenService');
+const { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromCookie } = require('../utils/cookie');
 
 const router = express.Router();
 
@@ -363,11 +364,12 @@ router.post('/login', loginLimiter, async (req, res) => {
       security_notice: !!securityNotice
     }, req, loginIpLocation);
 
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
     res.json({
       access_token: tokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
-      refresh_token: tokens.refreshToken,
       id_token: tokens.idToken,
       user: {
         id: user.id,
@@ -391,7 +393,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 router.post('/logout', authenticate, async (req, res) => {
   try {
-    const { refresh_token } = req.body;
+    const refresh_token = getRefreshTokenFromCookie(req);
     const redisClient = getRedisClient();
 
     const authHeader = req.headers.authorization;
@@ -418,19 +420,22 @@ router.post('/logout', authenticate, async (req, res) => {
       );
     }
 
+    clearRefreshTokenCookie(res);
     res.json({ message: '已成功退出登录' });
   } catch (err) {
     console.error('Logout error:', err);
+    clearRefreshTokenCookie(res);
     res.json({ message: '已成功退出登录' });
   }
 });
 
 router.post('/refresh', async (req, res) => {
   try {
-    const { refresh_token } = req.body;
+    const refresh_token = getRefreshTokenFromCookie(req);
 
     if (!refresh_token) {
-      return res.status(400).json({
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({
         error: 'invalid_request',
         message: '缺少 refresh_token'
       });
@@ -447,6 +452,7 @@ router.post('/refresh', async (req, res) => {
     );
 
     if (tokens.length === 0) {
+      clearRefreshTokenCookie(res);
       return res.status(401).json({
         error: 'invalid_grant',
         message: 'refresh_token 无效或已过期'
@@ -470,11 +476,12 @@ router.post('/refresh', async (req, res) => {
 
     const newTokens = await generateTokens(user);
 
+    setRefreshTokenCookie(res, newTokens.refreshToken);
+
     res.json({
       access_token: newTokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
-      refresh_token: newTokens.refreshToken,
       id_token: newTokens.idToken
     });
   } catch (err) {
@@ -504,6 +511,64 @@ router.post('/token-session', async (req, res) => {
   } catch (err) {
     console.error('Token session error:', err);
     res.status(500).json({ error: 'server_error', message: '生成会话令牌失败' });
+  }
+});
+
+// 会话恢复：通过 HttpOnly cookie 中的 refresh_token 恢复 access_token
+router.post('/session', async (req, res) => {
+  try {
+    const refresh_token = getRefreshTokenFromCookie(req);
+    if (!refresh_token) {
+      return res.status(401).json({ error: 'unauthenticated', message: '未登录' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
+    const rows = await db.query(
+      `SELECT rt.*, u.username, u.email, u.display_name, u.picture, u.role
+       FROM refresh_tokens rt
+       INNER JOIN users u ON u.id = rt.user_id
+       WHERE rt.token_hash = ? AND rt.revoked = FALSE AND rt.used = FALSE AND rt.expires_at > NOW()`,
+      [tokenHash]
+    );
+
+    if (rows.length === 0) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: 'unauthenticated', message: '会话已过期' });
+    }
+
+    const tokenRecord = rows[0];
+    await db.query('UPDATE refresh_tokens SET used = TRUE WHERE id = ?', [tokenRecord.id]);
+
+    const user = {
+      id: tokenRecord.user_id,
+      username: tokenRecord.username,
+      email: tokenRecord.email,
+      display_name: tokenRecord.display_name,
+      picture: tokenRecord.picture
+    };
+
+    const newTokens = await generateTokens(user);
+    setRefreshTokenCookie(res, newTokens.refreshToken);
+
+    log(user.id, ACTION.LOGIN, { method: 'session_restore' }, req);
+
+    res.json({
+      access_token: newTokens.accessToken,
+      token_type: 'Bearer',
+      expires_in: config.jwt.expiresIn,
+      id_token: newTokens.idToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        picture: user.picture,
+        role: tokenRecord.role || 'user'
+      }
+    });
+  } catch (err) {
+    console.error('Session restore error:', err);
+    res.status(500).json({ error: 'server_error', message: '会话恢复失败' });
   }
 });
 

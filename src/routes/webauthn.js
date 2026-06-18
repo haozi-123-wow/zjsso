@@ -7,6 +7,7 @@ const { getRedisClient } = require('../database/redis');
 const config = require('../config');
 const { authenticate } = require('../middleware/auth');
 const webauthnService = require('../services/webauthn/WebAuthnService');
+const { setRefreshTokenCookie } = require('../utils/cookie');
 const { log, ACTION } = require('../services/ActivityLogService');
 const { verifyTicket } = require('./verify');
 
@@ -159,11 +160,12 @@ router.post('/login/complete', async (req, res) => {
 
     log(user.id, ACTION.LOGIN, { method: 'passkey' }, req);
 
+    setRefreshTokenCookie(res, refreshToken);
+
     res.json({
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
-      refresh_token: refreshToken,
       id_token: idToken,
       user: {
         id: user.id,

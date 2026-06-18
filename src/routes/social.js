@@ -11,6 +11,7 @@ const { log, ACTION } = require('../services/ActivityLogService');
 const { generateTokens } = require('../services/TokenService');
 const { getRedisClient } = require('../database/redis');
 const config = require('../config');
+const { setRefreshTokenCookie } = require('../utils/cookie');
 
 const router = express.Router();
 
@@ -182,9 +183,11 @@ router.post('/social/callback/exchange', async (req, res) => {
     await redis.del(`social:code:${code}`);
 
     const tokenData = JSON.parse(stored);
+
+    setRefreshTokenCookie(res, tokenData.refreshToken);
+
     res.json({
       access_token: tokenData.accessToken,
-      refresh_token: tokenData.refreshToken,
       id_token: tokenData.idToken,
       expires_in: tokenData.expiresIn,
       user: tokenData.user

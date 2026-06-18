@@ -524,7 +524,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost, API_BASE } from '@/utils/api'
+import { apiGet, apiPost, API_BASE, getAccessToken } from '@/utils/api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -688,7 +688,7 @@ async function updateClient() {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        'Authorization': `Bearer ${getAccessToken()}`
       },
       body: JSON.stringify({
         client_name: clientForm.client_name,
@@ -699,7 +699,8 @@ async function updateClient() {
         response_types: clientForm.response_types,
         token_endpoint_auth_method: clientForm.token_endpoint_auth_method,
         pkce_required: clientForm.pkce_required
-      })
+      }),
+      credentials: 'include'
     })
     const data = await res.json()
     if (res.ok) {
@@ -717,7 +718,8 @@ async function deleteClient(id: string) {
   try {
     const res = await fetch(`${API_BASE}/api/clients/${id}`, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     if (res.ok || res.status === 204) {
       clients.value = clients.value.filter(c => c.id !== id)
@@ -734,7 +736,8 @@ async function resetClientSecret(c: any) {
   try {
     const res = await fetch(`${API_BASE}/api/clients/${c.id}/reset-secret`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     const data = await res.json()
     if (res.ok && data.client_secret) {
@@ -814,9 +817,10 @@ async function updateUser() {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        'Authorization': `Bearer ${getAccessToken()}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      credentials: 'include'
     })
     const data = await res.json()
     if (res.ok) {
@@ -836,9 +840,10 @@ function toggleUserStatus(u: any) {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      'Authorization': `Bearer ${getAccessToken()}`
     },
-    body: JSON.stringify({ enabled: !u.enabled })
+    body: JSON.stringify({ enabled: !u.enabled }),
+    credentials: 'include'
   })
     .then(res => res.json())
     .then(data => {
@@ -855,7 +860,8 @@ async function deleteUser(u: any) {
   try {
     const res = await fetch(`${API_BASE}/api/users/${u.id}`, {
       method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     if (res.ok || res.status === 204) {
       users.value = users.value.filter(x => x.id !== u.id)
@@ -879,7 +885,8 @@ async function uploadLogo(e: Event) {
   logoUploading.value = true
   try {
     const sigRes = await fetch(`${API_BASE}/api/upload/client-logo-signature?clientId=${clientId}&filename=${encodeURIComponent(file.name)}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
     })
     if (!sigRes.ok) { const d = await sigRes.json(); alert(d.message || '获取签名失败'); return }
     const sigData = await sigRes.json()
@@ -888,12 +895,13 @@ async function uploadLogo(e: Event) {
       Object.entries(sigData.formData).forEach(([k, v]) => fd.append(k, v as string))
     }
     fd.append('file', file)
-    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd })
+    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd, credentials: 'include' })
     if (!uploadRes.ok) { alert('上传到 COS 失败'); return }
     const confirmRes = await fetch(`${API_BASE}/api/upload/client-logo-confirm`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ key: sigData.key, clientId })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ key: sigData.key, clientId }),
+      credentials: 'include'
     })
     if (!confirmRes.ok) { alert('确认上传失败'); return }
     const confirmData = await confirmRes.json()
@@ -914,8 +922,9 @@ async function removeLogo() {
   try {
     const res = await fetch(`${API_BASE}/api/upload/client-logo`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
-      body: JSON.stringify({ clientId })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAccessToken()}` },
+      body: JSON.stringify({ clientId }),
+      credentials: 'include'
     })
     if (res.ok) {
       logoPreview.value = null
