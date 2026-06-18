@@ -35,8 +35,8 @@ function generateIdToken(user, client, nonce, accessToken) {
   const signingKey = provider.getSigningKey();
   const expiresIn = client.access_token_expires_in || config.jwt.expiresIn;
 
-  const atHash = crypto.createHash('sha256').update(accessToken).digest('hex').substring(0, 16);
-  const atHashBase64 = Buffer.from(atHash).toString('base64url');
+  const atHash = crypto.createHash('sha256').update(accessToken).digest().subarray(0, 16);
+  const atHashBase64 = atHash.toString('base64url');
 
   const payload = {
     iss: config.app.issuer,
