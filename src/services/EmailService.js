@@ -7,24 +7,31 @@ const { getRedisClient } = require('../database/redis');
 
 class EmailService {
   async sendActivationEmail(email, code) {
+    console.log('[Email] sendActivationEmail - email:', email, 'codePrefix:', code.substring(0, 2) + '***');
     const activationLink = `${config.app.frontendUrl}/#/verify-activation?code=${code}&email=${encodeURIComponent(email)}`;
 
     const htmlBody = this._buildActivationHtml(activationLink, code);
     const subject = '请激活您的账号 - ZJSSO 单点登录系统';
 
-    return this._sendEmail(email, subject, htmlBody);
+    const result = await this._sendEmail(email, subject, htmlBody);
+    console.log('[Email] sendActivationEmail result:', JSON.stringify(result));
+    return result;
   }
 
   async sendResetPasswordEmail(email, code) {
+    console.log('[Email] sendResetPasswordEmail - email:', email, 'codePrefix:', code.substring(0, 2) + '***');
     const resetLink = `${config.app.frontendUrl}/#/reset-password?code=${code}&email=${encodeURIComponent(email)}`;
 
     const htmlBody = this._buildResetPasswordHtml(resetLink, code);
     const subject = '重置您的密码 - ZJSSO 单点登录系统';
 
-    return this._sendEmail(email, subject, htmlBody);
+    const result = await this._sendEmail(email, subject, htmlBody);
+    console.log('[Email] sendResetPasswordEmail result:', JSON.stringify(result));
+    return result;
   }
 
   async sendVerificationEmail(email, code) {
+    console.log('[Email] sendVerificationEmail - email:', email, 'codePrefix:', code.substring(0, 2) + '***');
     const htmlBody = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -64,44 +71,57 @@ class EmailService {
 </body>
 </html>`;
     const subject = '安全验证 - ZJSSO 单点登录系统';
-    return this._sendEmail(email, subject, htmlBody);
+    const result = await this._sendEmail(email, subject, htmlBody);
+    console.log('[Email] sendVerificationEmail result:', JSON.stringify(result));
+    return result;
   }
 
   async storeCode(email, code, type, ttlSeconds = 3600) {
+    console.log('[Email] storeCode - email:', email, 'type:', type, 'ttl:', ttlSeconds, 'codePrefix:', code.substring(0, 2) + '***');
     const client = getRedisClient();
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    const dataToStore = { codeHash, type, expires_at: Math.floor(Date.now() / 1000) + ttlSeconds };
     await client.set(
       `email:code:${email}`,
-      JSON.stringify({ codeHash, type, expires_at: Math.floor(Date.now() / 1000) + ttlSeconds }),
+      JSON.stringify(dataToStore),
       'PX',
       ttlSeconds * 1000
     );
+    console.log('[Email] storeCode - stored in Redis successfully');
   }
 
   async verifyCode(email, code, type) {
+    console.log('[Email] verifyCode - email:', email, 'type:', type, 'codePrefix:', code.substring(0, 2) + '***');
     const client = getRedisClient();
     const data = await client.get(`email:code:${email}`);
 
     if (!data) {
+      console.warn('[Email] verifyCode - no data found in Redis for email:', email);
       return { valid: false, reason: '验证码不存在或已过期' };
     }
 
     try {
       const parsed = JSON.parse(data);
+      console.log('[Email] verifyCode - stored type:', parsed.type, 'expires_at:', parsed.expires_at, 'current_time:', Math.floor(Date.now() / 1000));
       const codeHash = crypto.createHash('sha256').update(code).digest('hex');
       if (parsed.codeHash !== codeHash) {
+        console.warn('[Email] verifyCode - code hash mismatch');
         return { valid: false, reason: '验证码不正确' };
       }
       if (parsed.type !== type) {
+        console.warn('[Email] verifyCode - type mismatch, expected:', type, 'got:', parsed.type);
         return { valid: false, reason: '验证码类型不匹配' };
       }
       if (parsed.expires_at < Math.floor(Date.now() / 1000)) {
+        console.warn('[Email] verifyCode - expired');
         return { valid: false, reason: '验证码已过期' };
       }
 
       await client.del(`email:code:${email}`);
+      console.log('[Email] verifyCode - verification successful, code deleted from Redis');
       return { valid: true };
-    } catch {
+    } catch (err) {
+      console.error('[Email] verifyCode - parse error:', err.message);
       return { valid: false, reason: '验证码数据异常' };
     }
   }
@@ -216,10 +236,12 @@ class EmailService {
 
   async _sendEmail(toAddress, subject, htmlBody) {
     if (!config.email.accessKeyId || !config.email.accessKeySecret || !config.email.accountName) {
-      console.warn('Email service not configured, skipping email send');
-      console.log(`[Email Mock] To: ${toAddress}, Subject: ${subject}`);
+      console.warn('[Email] _sendEmail - Service not configured, skipping. accessKeyId:', !!config.email.accessKeyId, 'accessKeySecret:', !!config.email.accessKeySecret, 'accountName:', !!config.email.accountName);
+      console.log(`[Email] _sendEmail - MOCK MODE - To: ${toAddress}, Subject: ${subject}`);
       return { success: true, mock: true };
     }
+
+    console.log('[Email] _sendEmail - Preparing to send - To:', toAddress, 'Subject:', subject, 'AccountName:', config.email.accountName, 'Region:', config.email.region);
 
     const params = {
       Action: 'SingleSendMail',
@@ -251,16 +273,19 @@ class EmailService {
 
     const queryString = `${canonicalizedQuery}&Signature=${encodeURIComponent(signature)}`;
     const requestUrl = `https://dm.aliyuncs.com/?${queryString}`;
+    console.log('[Email] _sendEmail - Request URL (params hidden):', requestUrl.substring(0, 80) + '...');
 
     try {
       const result = await this._httpGet(requestUrl);
+      console.log('[Email] _sendEmail - API response:', JSON.stringify(result));
       if (result && result.EnvId) {
+        console.log('[Email] _sendEmail - Success, RequestId:', result.RequestId, 'EnvId:', result.EnvId);
         return { success: true, requestId: result.RequestId, envId: result.EnvId };
       }
-      console.error('Failed to send email:', result);
+      console.error('[Email] _sendEmail - API returned error:', JSON.stringify(result));
       return { success: false, error: result };
     } catch (err) {
-      console.error('Email send error:', err.message);
+      console.error('[Email] _sendEmail - Network/HTTP error:', err.message, err.stack);
       return { success: false, error: err.message };
     }
   }

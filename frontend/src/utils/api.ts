@@ -65,25 +65,50 @@ export async function ensureValidToken() {
   }
 }
 
+class ApiError extends Error {
+  statusCode: number
+  errorCode: string
+  constructor(message: string, statusCode: number, errorCode: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.statusCode = statusCode
+    this.errorCode = errorCode
+  }
+}
+
+async function checkRes(res: Response) {
+  const data = await res.json()
+  if (!res.ok) {
+    throw new ApiError(data.message || '请求失败', res.status, data.error || 'unknown')
+  }
+  return data
+}
+
 export async function apiGet(path: string) {
   await ensureValidToken()
   const headers: Record<string, string> = {}
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+  console.log(`[API] GET ${path}`)
   const res = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include' })
-  return res.json()
+  const data = await checkRes(res)
+  console.log(`[API] GET ${path} ->`, res.status, JSON.stringify(data).substring(0, 200))
+  return data
 }
 
 export async function apiPost(path: string, body?: any) {
   await ensureValidToken()
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+  console.log(`[API] POST ${path}`, body ? JSON.stringify(body).substring(0, 200) : '')
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers,
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'include',
   })
-  return res.json()
+  const data = await checkRes(res)
+  console.log(`[API] POST ${path} ->`, res.status, JSON.stringify(data).substring(0, 200))
+  return data
 }
 
 export async function apiPut(path: string, body?: any) {
@@ -97,7 +122,7 @@ export async function apiPut(path: string, body?: any) {
     credentials: 'include',
   })
   if (res.status === 204) return null
-  return res.json()
+  return checkRes(res)
 }
 
 export async function apiDelete(path: string) {
@@ -110,7 +135,7 @@ export async function apiDelete(path: string) {
     credentials: 'include',
   })
   if (res.status === 204) return null
-  return res.json()
+  return checkRes(res)
 }
 
 export { API_BASE }

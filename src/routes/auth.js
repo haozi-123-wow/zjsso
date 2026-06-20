@@ -416,7 +416,10 @@ router.post('/send-login-code', loginCodeRateLimiter, async (req, res) => {
   try {
     const { email, lot_number = '', captcha_output = '', pass_token = '', gen_time = '' } = req.body;
 
+    console.log('[EmailLogin] POST /send-login-code - email:', email);
+
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.warn('[EmailLogin] Invalid email format:', email);
       return res.status(400).json({
         error: 'invalid_email',
         message: '邮箱格式不正确',
@@ -427,8 +430,10 @@ router.post('/send-login-code', loginCodeRateLimiter, async (req, res) => {
     const geetestResult = await geetestService.validate({
       lot_number, captcha_output, pass_token, gen_time
     });
+    console.log('[EmailLogin] Geetest validation result:', geetestResult.result);
 
     if (geetestResult.result !== 'success') {
+      console.warn('[EmailLogin] Geetest failed');
       return res.status(403).json({
         error: 'geetest_failed',
         message: '行为验证未通过，请重试',
@@ -438,18 +443,24 @@ router.post('/send-login-code', loginCodeRateLimiter, async (req, res) => {
 
     // 不区分用户是否存在，统一返回泛化响应以防止用户枚举
     const user = await User.findByEmail(email);
+    console.log('[EmailLogin] User lookup - found:', !!user, 'enabled:', user?.enabled, 'email_verified:', user?.email_verified);
+
     if (user && user.enabled && user.email_verified) {
       const code = emailService.generateCode();
+      console.log('[EmailLogin] Generated login code, storing and sending...');
       await emailService.storeCode(email, code, 'login', 600);
       await emailService.sendVerificationEmail(email, code);
+    } else {
+      console.log('[EmailLogin] User not found or not eligible for email login, skipping code send');
     }
 
     res.json({
       message: '如果该邮箱已注册，验证码已发送',
       expires_in: 600
     });
+    console.log('[EmailLogin] Send login code response sent');
   } catch (err) {
-    console.error('Send login code error:', err);
+    console.error('[EmailLogin] Send login code error:', err.message, err.stack);
     res.status(500).json({
       error: 'server_error',
       message: '发送验证码失败',
@@ -463,7 +474,10 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
   try {
     const { email, code } = req.body;
 
+    console.log('[EmailLogin] POST /login-with-code - email:', email, 'codePrefix:', code ? code.substring(0, 2) + '***' : 'empty');
+
     if (!email || !code) {
+      console.warn('[EmailLogin] Missing email or code');
       return res.status(400).json({
         error: 'invalid_request',
         message: '邮箱和验证码不能为空',
@@ -472,6 +486,8 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
     }
 
     const verification = await emailService.verifyCode(email, code, 'login');
+    console.log('[EmailLogin] Code verification result:', verification.valid, 'reason:', verification.reason);
+
     if (!verification.valid) {
       return res.status(400).json({
         error: 'invalid_code',
@@ -481,7 +497,10 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
     }
 
     const user = await User.findByEmail(email);
+    console.log('[EmailLogin] User lookup - found:', !!user, 'enabled:', user?.enabled);
+
     if (!user) {
+      console.warn('[EmailLogin] User not found after code verification');
       return res.status(401).json({
         error: 'invalid_grant',
         message: '登录失败，请重试',
@@ -490,6 +509,7 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
     }
 
     if (!user.enabled) {
+      console.warn('[EmailLogin] Account disabled:', user.id);
       return res.status(403).json({
         error: 'account_disabled',
         message: '账号已被禁用',
@@ -499,6 +519,7 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
 
     const loginIp = getClientIp(req);
     const loginIpLocation = await getIpLocation(loginIp);
+    console.log('[EmailLogin] Login IP:', loginIp, 'location:', loginIpLocation);
 
     const prevIpLocation = user.last_login_ip_location;
     let securityNotice = null;
@@ -510,6 +531,7 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
         previous_ip: user.last_login_ip,
         current_ip: loginIp
       };
+      console.log('[EmailLogin] Security notice triggered - previous:', prevIpLocation, 'current:', loginIpLocation);
     }
 
     await db.query(
@@ -522,6 +544,7 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
     // TOTP 2FA 检查
     const totpRows = await db.query('SELECT enabled FROM user_totp WHERE user_id = ? AND enabled = TRUE', [user.id]);
     if (totpRows.length > 0) {
+      console.log('[EmailLogin] TOTP 2FA required for user:', user.id);
       const tempToken = generateTempToken(user.id);
       return res.json({
         require_2fa: true,
@@ -560,8 +583,9 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
       },
       ...(securityNotice ? { security_notice: securityNotice } : {})
     });
+    console.log('[EmailLogin] Login successful for user:', user.id, 'username:', user.username);
   } catch (err) {
-    console.error('Login with code error:', err);
+    console.error('[EmailLogin] Login with code error:', err.message, err.stack);
     res.status(500).json({
       error: 'server_error',
       message: '登录失败，请稍后再试',

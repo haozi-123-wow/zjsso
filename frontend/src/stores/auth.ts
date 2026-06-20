@@ -67,34 +67,44 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function sendActivationEmail(email: string) {
+    console.log('[AuthStore] sendActivationEmail - email:', email)
     return apiPost('/api/email/send-activation', { email })
   }
 
   async function sendResetPasswordEmail(email: string) {
+    console.log('[AuthStore] sendResetPasswordEmail - email:', email)
     return apiPost('/api/email/send-reset-password', { email })
   }
 
   async function verifyActivation(code: string, email: string) {
+    console.log('[AuthStore] verifyActivation - email:', email, 'codePrefix:', code.substring(0, 2) + '***')
     const res = await fetch(`${API_BASE}/api/email/verify-activation?code=${code}&email=${encodeURIComponent(email)}`)
-    return res.json()
+    const data = await res.json()
+    console.log('[AuthStore] verifyActivation response:', data)
+    return data
   }
 
   async function resetPassword(email: string, resetCode: string, newPassword: string) {
+    console.log('[AuthStore] resetPassword - email:', email, 'codePrefix:', resetCode.substring(0, 2) + '***')
     return apiPost('/api/email/reset-password', { email, reset_code: resetCode, new_password: newPassword, confirm_password: newPassword })
   }
 
   async function sendLoginCode(email: string, geetest?: { lot_number: string; captcha_output: string; pass_token: string; gen_time: string }) {
+    console.log('[AuthStore] sendLoginCode - email:', email)
     const body: any = { email }
     if (geetest) Object.assign(body, geetest)
     return apiPost('/api/auth/send-login-code', body)
   }
 
   async function loginWithCode(email: string, code: string) {
+    console.log('[AuthStore] loginWithCode - email:', email, 'codePrefix:', code.substring(0, 2) + '***')
     const data = await apiPost('/api/auth/login-with-code', { email, code })
+    console.log('[AuthStore] loginWithCode response:', JSON.stringify(data))
     if (data.access_token) {
       setTokens(data.access_token, '', data.expires_in)
       user.value = data.user
       localStorage.setItem('user', JSON.stringify(data.user))
+      console.log('[AuthStore] loginWithCode - tokens set, user stored in localStorage')
     }
     return data
   }

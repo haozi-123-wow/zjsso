@@ -2,6 +2,7 @@
   <div v-if="!auth.isLoggedIn" class="auth-page">
     <div class="page-header">
       <div class="header-glow"></div>
+      <div class="header-grid"></div>
       <div class="header-content">
         <span class="page-tag">PROFILE</span>
         <h1 class="page-title">个人中心</h1>
@@ -20,32 +21,63 @@
   <div v-else class="auth-page">
     <div class="page-header">
       <div class="header-glow"></div>
+      <div class="header-grid"></div>
       <div class="header-content">
         <span class="page-tag">PROFILE</span>
         <h1 class="page-title">个人中心</h1>
         <div class="title-line"></div>
-        <p class="page-subtitle">MY ACCOUNT</p>
+        <p class="page-subtitle">MY ACCOUNT · 账号信息、安全设置、活动记录</p>
+        <div class="header-stats">
+          <div class="stat-pill"><span class="stat-num">{{ passkeyCount }}</span><span class="stat-lbl">通行密钥</span></div>
+          <div class="stat-pill"><span class="stat-num">{{ consentsCount }}</span><span class="stat-lbl">授权应用</span></div>
+          <div class="stat-pill"><span class="stat-num">{{ socialCount }}</span><span class="stat-lbl">社交绑定</span></div>
+        </div>
       </div>
     </div>
 
     <div class="profile-container">
       <div class="profile-grid">
         <div class="profile-card">
+          <div class="card-bg-glow"></div>
           <div class="avatar-section">
-            <div class="avatar-wrapper" @click="triggerAvatarUpload">
-              <img v-if="auth.user?.picture" :src="auth.user.picture" class="avatar-img" alt="头像" />
-              <div v-else class="avatar-letter">{{ (auth.user?.display_name || auth.user?.username || 'U').charAt(0).toUpperCase() }}</div>
-              <div class="avatar-overlay">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="camera-icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                <span>{{ uploadingAvatar ? '上传中...' : '更换头像' }}</span>
+            <div class="avatar-ring">
+              <div class="avatar-wrapper" @click="triggerAvatarUpload">
+                <img v-if="auth.user?.picture" :src="auth.user.picture" class="avatar-img" alt="头像" />
+                <div v-else class="avatar-letter">{{ (auth.user?.display_name || auth.user?.username || 'U').charAt(0).toUpperCase() }}</div>
+                <div class="avatar-overlay">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="camera-icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <span>{{ uploadingAvatar ? '上传中...' : '更换头像' }}</span>
+                </div>
+                <div class="avatar-status-dot"></div>
               </div>
             </div>
             <input ref="avatarInputRef" type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="handleAvatarChange" style="display:none" />
             <h2 class="display-name">{{ auth.user?.display_name || auth.user?.username }}</h2>
             <p class="user-email">{{ auth.user?.email }}</p>
-            <span :class="['role-badge', auth.user?.role]">{{ roleLabel }}</span>
+            <div class="role-row">
+              <span :class="['role-badge', auth.user?.role]">{{ roleLabel }}</span>
+              <span v-if="totpStatus" class="role-badge 2fa-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                2FA 已启用
+              </span>
+            </div>
+
+            <!-- 资料完整性 -->
+            <div class="profile-meta">
+              <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>已加入 ZJSSO</span>
+              </div>
+              <div class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                <span>资料完整度 {{ profileCompleteness }}%</span>
+              </div>
+            </div>
           </div>
-          <button class="btn-logout" @click="handleLogout">退出登录</button>
+          <button class="btn-logout" @click="handleLogout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            退出登录
+          </button>
         </div>
 
         <div class="profile-right">
@@ -74,23 +106,58 @@
 
           <div class="profile-panel" v-if="profileTab === 'overview'">
             <div class="details-card">
+              <div class="card-bg-glow card-bg-glow--blue"></div>
               <div class="section-title-row">
-                <h3 class="section-title" style="margin-bottom:0">账号信息</h3>
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">账号信息</h3>
+                </div>
                 <button class="btn-edit" @click="openEditProfile">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   编辑
                 </button>
               </div>
-              <div class="detail-row"><span class="detail-label">用户名</span><span class="detail-value">{{ auth.user?.username }}</span></div>
-              <div class="detail-row"><span class="detail-label">邮箱</span><span class="detail-value">{{ auth.user?.email }}</span></div>
-              <div class="detail-row"><span class="detail-label">QQ号</span><span class="detail-value">{{ auth.user?.qq || '-' }}</span></div>
-              <div class="detail-row"><span class="detail-label">角色</span><span class="detail-value">{{ roleLabel }}</span></div>
+              <div class="detail-grid">
+                <div class="detail-row">
+                  <span class="detail-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>用户名</span>
+                  <span class="detail-value">{{ auth.user?.username }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>邮箱</span>
+                  <span class="detail-value">{{ auth.user?.email }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>QQ号</span>
+                  <span class="detail-value">{{ auth.user?.qq || '-' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>角色</span>
+                  <span class="detail-value">
+                    <span :class="['role-badge-inline', auth.user?.role]">{{ roleLabel }}</span>
+                  </span>
+                </div>
+              </div>
             </div>
             <div class="details-card" style="margin-top:20px">
-              <h3 class="section-title">双因素认证</h3>
+              <div class="card-bg-glow card-bg-glow--green"></div>
+              <div class="section-title-row">
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">双因素认证</h3>
+                </div>
+                <span v-if="totpStatus === true" class="status-pill status-pill--active">
+                  <span class="status-dot"></span>已启用
+                </span>
+                <span v-else-if="totpStatus === false" class="status-pill status-pill--inactive">
+                  <span class="status-dot"></span>未启用
+                </span>
+              </div>
               <div v-if="totpStatus === null" class="empty-state"><p>加载中...</p></div>
               <div v-else-if="!totpStatus">
-                <p style="font-size:14px;color:#6B7280;margin-bottom:16px">启用双因素认证(TOTP)可以为您的账户增加一层安全保护。</p>
+                <div class="info-callout">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="info-icon"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  <span>启用双因素认证(TOTP)可以为您的账户增加一层安全保护。</span>
+                </div>
                 <button class="btn-register-key" @click="setupTotp" :disabled="totpLoading">{{ totpLoading ? '生成中...' : '启用 2FA' }}</button>
                 <div v-if="totpSetupData" class="totp-setup">
                   <div class="totp-qr-wrap">
@@ -114,20 +181,35 @@
               </div>
               <div v-else>
                 <div class="totp-enabled">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="totp-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
-                  <div>
-                    <span style="font-size:15px;font-weight:600;color:#6EE7B7">双因素认证已启用</span>
-                    <span style="font-size:13px;color:#6B7280;margin-top:2px">登录时需要输入身份验证器应用中的动态码</span>
+                  <div class="totp-icon-wrap">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="totp-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                  </div>
+                  <div class="totp-enabled-text">
+                    <span class="totp-enabled-title">双因素认证已启用</span>
+                    <span class="totp-enabled-desc">登录时需要输入身份验证器应用中的动态码</span>
+                  </div>
+                  <div class="totp-check">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   </div>
                 </div>
-                <button class="btn-register-key" style="margin-top:16px;border-color:rgba(239,68,68,0.2);color:#FCA5A5" @click="disableTotp">关闭 2FA</button>
+                <button class="totp-disable-btn" @click="disableTotp">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  关闭 2FA
+                </button>
               </div>
             </div>
           </div>
 
           <div class="profile-panel" v-if="profileTab === 'passkeys'">
             <div class="webauthn-card">
-              <h3 class="section-title">通行密钥</h3>
+              <div class="card-bg-glow"></div>
+              <div class="section-title-row">
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">通行密钥</h3>
+                </div>
+                <span class="count-badge">{{ credentials.length }} 个</span>
+              </div>
               <div v-if="credentials.length === 0" class="empty-state">
                 <p>尚未注册通行密钥</p>
               </div>
@@ -151,7 +233,14 @@
 
           <div class="profile-panel" v-if="profileTab === 'consents'">
             <div class="consents-card">
-              <h3 class="section-title">已授权应用</h3>
+              <div class="card-bg-glow"></div>
+              <div class="section-title-row">
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">已授权应用</h3>
+                </div>
+                <span class="count-badge">{{ consents.length }} 个</span>
+              </div>
               <div v-if="consents.length === 0" class="empty-state"><p>尚未授权任何应用</p></div>
               <div v-else class="consents-list">
                 <div v-for="item in consents" :key="item.id" class="consent-item">
@@ -169,7 +258,14 @@
 
           <div class="profile-panel" v-if="profileTab === 'social'">
             <div class="social-card">
-              <h3 class="section-title">社交绑定</h3>
+              <div class="card-bg-glow"></div>
+              <div class="section-title-row">
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">社交绑定</h3>
+                </div>
+                <span class="count-badge">{{ socialConnections.length }} 个</span>
+              </div>
               <div v-if="socialConnections.length === 0" class="empty-state"><p>尚未绑定社交账号</p></div>
               <div v-else class="social-list">
                 <div v-for="conn in socialConnections" :key="conn.id" class="social-item">
@@ -191,7 +287,14 @@
 
           <div class="profile-panel" v-if="profileTab === 'activities'">
             <div class="activities-card">
-              <h3 class="section-title">账户活动</h3>
+              <div class="card-bg-glow"></div>
+              <div class="section-title-row">
+                <div class="title-with-icon">
+                  <span class="title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                  <h3 class="section-title" style="margin-bottom:0">账户活动</h3>
+                </div>
+                <span class="count-badge">最近 {{ activities.length }} 条</span>
+              </div>
               <div v-if="activities.length === 0" class="empty-state"><p>暂无活动记录</p></div>
               <div v-else class="activities-list">
                 <div v-for="act in activities" :key="act.id" class="activity-item">
@@ -369,6 +472,20 @@ const editVerifyError = ref('')
 const roleLabel = computed(() => {
   const map: Record<string, string> = { user: '普通用户', developer: '开发者', admin: '管理员' }
   return map[auth.user?.role] || '普通用户'
+})
+
+const passkeyCount = computed(() => credentials.value.length)
+const consentsCount = computed(() => consents.value.length)
+const socialCount = computed(() => socialConnections.value.length)
+
+const profileCompleteness = computed(() => {
+  let score = 0
+  if (auth.user?.display_name || auth.user?.username) score += 25
+  if (auth.user?.email) score += 25
+  if (auth.user?.qq) score += 15
+  if (auth.user?.picture) score += 15
+  if (totpStatus.value) score += 20
+  return Math.min(100, score)
 })
 
 onMounted(async () => {
@@ -607,6 +724,7 @@ function selectVerifyMethod(m: string) {
 }
 
 async function sendVerifyEmail() {
+  console.log('[Profile] sendVerifyEmail - sending verification email...')
   verifySending.value = true
   verifyError.value = ''
   try {
@@ -616,8 +734,9 @@ async function sendVerifyEmail() {
       credentials: 'include'
     })
     const data = await res.json()
+    console.log('[Profile] sendVerifyEmail response:', res.status, data)
     if (!data.sent) { verifyError.value = data.message || '发送失败' }
-  } catch { verifyError.value = '发送失败' }
+  } catch (err) { console.error('[Profile] sendVerifyEmail error:', err); verifyError.value = '发送失败' }
   finally { verifySending.value = false }
 }
 
@@ -755,6 +874,7 @@ function selectEditVerifyMethod(m: string) {
 }
 
 async function sendEditVerifyEmail() {
+  console.log('[Profile] sendEditVerifyEmail - sending verification email for edit...')
   editVerifySending.value = true
   editVerifyError.value = ''
   try {
@@ -764,8 +884,9 @@ async function sendEditVerifyEmail() {
       credentials: 'include'
     })
     const data = await res.json()
+    console.log('[Profile] sendEditVerifyEmail response:', res.status, data)
     if (!data.sent) { editVerifyError.value = data.message || '发送失败' }
-  } catch { editVerifyError.value = '发送失败' }
+  } catch (err) { console.error('[Profile] sendEditVerifyEmail error:', err); editVerifyError.value = '发送失败' }
   finally { editVerifySending.value = false }
 }
 
@@ -876,24 +997,30 @@ async function handleAvatarChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || !input.files[0]) return
   const file = input.files[0]
+  console.log('[Profile] handleAvatarChange - file:', file.name, 'type:', file.type, 'size:', file.size)
   const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-  if (!allowed.includes(file.type)) { alert('仅支持 JPG/PNG/GIF/WebP 格式'); return }
-  if (file.size > 2 * 1024 * 1024) { alert('图片大小不能超过 2MB'); return }
+  if (!allowed.includes(file.type)) { console.warn('[Profile] Invalid file type:', file.type); alert('仅支持 JPG/PNG/GIF/WebP 格式'); return }
+  if (file.size > 2 * 1024 * 1024) { console.warn('[Profile] File too large:', file.size); alert('图片大小不能超过 2MB'); return }
   uploadingAvatar.value = true
   try {
+    console.log('[Profile] Step 1: Fetching avatar signature...')
     const sigRes = await fetch(`${API_BASE}/api/upload/avatar-signature?filename=${encodeURIComponent(file.name)}`, {
       headers: { 'Authorization': `Bearer ${getAccessToken()}` },
       credentials: 'include'
     })
-    if (!sigRes.ok) { const d = await sigRes.json(); alert(d.message || '获取签名失败'); return }
+    if (!sigRes.ok) { const d = await sigRes.json(); console.error('[Profile] Signature fetch failed:', d); alert(d.message || '获取签名失败'); return }
     const sigData = await sigRes.json()
+    console.log('[Profile] Step 1 OK - signature data received, uploadUrl:', sigData.uploadUrl, 'key:', sigData.key)
     const fd = new FormData()
     if (sigData.formData) {
       Object.entries(sigData.formData).forEach(([k, v]) => fd.append(k, v as string))
     }
     fd.append('file', file)
-    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd, credentials: 'include' })
-    if (!uploadRes.ok) { alert('上传到 COS 失败'); return }
+    console.log('[Profile] Step 2: Uploading to COS...')
+    const uploadRes = await fetch(sigData.uploadUrl, { method: 'POST', body: fd })
+    if (!uploadRes.ok) { console.error('[Profile] COS upload failed, status:', uploadRes.status); alert('上传到 COS 失败'); return }
+    console.log('[Profile] Step 2 OK - COS upload successful')
+    console.log('[Profile] Step 3: Confirming avatar upload...')
     const confirmRes = await fetch(`${API_BASE}/api/upload/avatar-confirm`, {
       method: 'POST',
       headers: {
@@ -903,14 +1030,16 @@ async function handleAvatarChange(e: Event) {
       body: JSON.stringify({ key: sigData.key }),
       credentials: 'include'
     })
-    if (!confirmRes.ok) { alert('确认上传失败'); return }
+    if (!confirmRes.ok) { console.error('[Profile] Confirm failed, status:', confirmRes.status); alert('确认上传失败'); return }
     const confirmData = await confirmRes.json()
+    console.log('[Profile] Step 3 OK - confirm data:', confirmData)
     if (confirmData.avatar) {
       if (auth.user) auth.user.picture = confirmData.avatar
       localStorage.setItem('user', JSON.stringify(auth.user))
+      console.log('[Profile] Avatar updated in store and localStorage:', confirmData.avatar)
       alert('头像上传成功')
     }
-  } catch { alert('头像上传失败') }
+  } catch (err) { console.error('[Profile] Avatar upload error:', err); alert('头像上传失败') }
   finally { uploadingAvatar.value = false; input.value = '' }
 }
 
@@ -1023,6 +1152,90 @@ function base64URLToBuffer(base64url: string) {
 </script>
 
 <style scoped>
+/* ============ 页面头部 ============ */
+.header-grid { position: absolute; inset: 0; z-index: 0; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 40px 40px; mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%); -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%); pointer-events: none; }
+.header-content { position: relative; z-index: 2; }
+.header-stats { display: flex; gap: 10px; margin-top: 18px; justify-content: center; flex-wrap: wrap; }
+.stat-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 999px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: all 0.3s ease; line-height: 1; }
+.stat-pill:hover { background: rgba(230,57,70,0.08); border-color: rgba(230,57,70,0.15); transform: translateY(-2px); }
+.stat-num { font-size: 18px; font-weight: 700; color: #E63946; }
+.stat-lbl { font-size: 12px; color: #9CA3AF; letter-spacing: 0.5px; }
+
+/* ============ 卡片装饰光斑 ============ */
+.card-bg-glow { position: absolute; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(230,57,70,0.08), transparent 65%); filter: blur(40px); pointer-events: none; top: -80px; right: -60px; z-index: 0; }
+.card-bg-glow--blue { background: radial-gradient(circle, rgba(59,130,246,0.08), transparent 65%); }
+.card-bg-glow--green { background: radial-gradient(circle, rgba(16,185,129,0.08), transparent 65%); }
+
+/* ============ 标题图标 ============ */
+.title-with-icon { display: flex; align-items: center; gap: 10px; }
+.title-icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(230,57,70,0.15), rgba(230,57,70,0.05)); border: 1px solid rgba(230,57,70,0.2); border-radius: 9px; color: #E63946; flex-shrink: 0; }
+.title-icon svg { width: 16px; height: 16px; }
+
+/* ============ 计数徽章 ============ */
+.count-badge { display: inline-flex; align-items: center; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 999px; font-size: 11px; font-weight: 600; color: #9CA3AF; letter-spacing: 0.5px; }
+
+/* ============ 状态徽章 ============ */
+.status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+.status-pill--active { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); color: #6EE7B7; }
+.status-pill--inactive { background: rgba(107,114,128,0.1); border: 1px solid rgba(107,114,128,0.2); color: #9CA3AF; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; animation: statusPulse 2s ease-in-out infinite; }
+@keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* ============ 信息提示框 ============ */
+.info-callout { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.12); border-radius: 10px; margin-bottom: 16px; font-size: 13px; color: #93C5FD; line-height: 1.6; }
+.info-callout .info-icon { width: 18px; height: 18px; flex-shrink: 0; color: #60A5FA; margin-top: 1px; }
+
+/* ============ 详情行优化 ============ */
+.detail-grid { display: flex; flex-direction: column; gap: 2px; }
+.detail-label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #6B7280; }
+.detail-label svg { width: 16px; height: 16px; color: #4B5563; }
+.detail-value { font-size: 14px; color: #E5E7EB; font-weight: 600; }
+.role-badge-inline { display: inline-flex; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.role-badge-inline.admin { background: rgba(239,68,68,0.12); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.2); }
+.role-badge-inline.developer { background: rgba(59,130,246,0.12); color: #93C5FD; border: 1px solid rgba(59,130,246,0.2); }
+.role-badge-inline.user { background: rgba(16,185,129,0.12); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.2); }
+
+/* ============ 2FA 启用提示 ============ */
+.totp-enabled { display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.03)); border: 1px solid rgba(16,185,129,0.18); border-radius: 12px; position: relative; overflow: hidden; }
+.totp-enabled::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, #10B981, rgba(16,185,129,0.3)); }
+.totp-icon-wrap { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.25); border-radius: 12px; flex-shrink: 0; box-shadow: 0 4px 16px rgba(16,185,129,0.15); }
+.totp-icon-wrap .totp-shield { width: 24px; height: 24px; color: #6EE7B7; }
+.totp-enabled-text { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.totp-enabled-title { font-size: 15px; font-weight: 600; color: #6EE7B7; }
+.totp-enabled-desc { font-size: 12px; color: #9CA3AF; line-height: 1.5; }
+.totp-check { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,0.2); border-radius: 50%; flex-shrink: 0; }
+.totp-check svg { width: 18px; height: 18px; color: #10B981; }
+
+.totp-disable-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 0; background: none; border: none; color: #F87171; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; position: relative; transition: color 0.25s ease; }
+.totp-disable-btn svg { width: 14px; height: 14px; }
+.totp-disable-btn::after { content: ''; position: absolute; left: 0; right: 0; bottom: -3px; height: 1px; background: currentColor; opacity: 0.3; transition: opacity 0.25s ease; }
+.totp-disable-btn:hover { color: #FCA5A5; }
+.totp-disable-btn:hover::after { opacity: 0.7; }
+
+/* ============ 头像光环 ============ */
+.avatar-ring { position: relative; width: 132px; height: 132px; margin: 0 auto 24px; padding: 6px; border-radius: 50%; background: linear-gradient(135deg, rgba(230,57,70,0.4), rgba(230,57,70,0.1) 50%, transparent); }
+.avatar-ring::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; padding: 2px; background: conic-gradient(from 0deg, rgba(230,57,70,0.6), rgba(230,57,70,0.1), rgba(230,57,70,0.6)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ringRotate 8s linear infinite; }
+@keyframes ringRotate { to { transform: rotate(360deg); } }
+.avatar-ring .avatar-wrapper { width: 120px; height: 120px; margin: 0; }
+.avatar-ring + h2 { margin-top: 24px; }
+.avatar-status-dot { position: absolute; bottom: 6px; right: 6px; width: 16px; height: 16px; background: #10B981; border-radius: 50%; border: 3px solid rgba(18,20,26,0.95); box-shadow: 0 0 10px rgba(16,185,129,0.6); animation: statusPulse 2s ease-in-out infinite; }
+
+/* ============ 角色行 ============ */
+.role-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.2fa-badge { display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.12)); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.4); box-shadow: 0 2px 8px rgba(16,185,129,0.1); }
+.2fa-badge svg { flex-shrink: 0; }
+
+/* ============ 资料完整性 ============ */
+.profile-meta { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; margin-bottom: 4px; }
+.meta-item { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #9CA3AF; }
+.meta-item svg { width: 14px; height: 14px; color: #6B7280; flex-shrink: 0; }
+
+/* ============ 退出登录按钮 ============ */
+.btn-logout { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* ============ TOTP 危险按钮 ============ */
+.btn-register-key--danger { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05)); border-color: rgba(239,68,68,0.2); color: #FCA5A5; }
+.btn-register-key--danger:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); box-shadow: 0 6px 24px rgba(239,68,68,0.15); }
 .profile-container { max-width: 1000px; margin: 0 auto; padding: 0 24px 80px; position: relative; z-index: 1; }
 .profile-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
 
@@ -1030,16 +1243,19 @@ function base64URLToBuffer(base64url: string) {
 
 .profile-tabs {
   display: flex; gap: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 5px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.18));
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 6px;
   overflow-x: auto;
   position: relative;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .profile-tab {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 14px 16px;
-  border: none; border-radius: 9px;
+  border: none; border-radius: 10px;
   background: transparent;
   color: #6B7280;
   font-size: 14px; font-weight: 600;
@@ -1050,9 +1266,9 @@ function base64URLToBuffer(base64url: string) {
   -webkit-tap-highlight-color: transparent;
 }
 .profile-tab .tab-icon { width: 18px; height: 18px; flex-shrink: 0; transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-.profile-tab.active { background: rgba(230, 57, 70, 0.12); color: #E63946; }
+.profile-tab.active { background: linear-gradient(135deg, rgba(230, 57, 70, 0.18), rgba(230, 57, 70, 0.08)); color: #E63946; box-shadow: 0 4px 16px rgba(230,57,70,0.15); }
 .profile-tab.active .tab-icon { transform: scale(1.1); }
-.profile-tab:hover:not(.active) { color: #9CA3AF; }
+.profile-tab:hover:not(.active) { color: #9CA3AF; background: rgba(255,255,255,0.02); }
 .profile-tab:hover:not(.active) .tab-icon { transform: translateY(-2px); }
 
 .profile-tab::after {
@@ -1073,15 +1289,19 @@ function base64URLToBuffer(base64url: string) {
 }
 
 .profile-card, .details-card, .webauthn-card, .social-card, .consents-card, .activities-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.012));
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;
   padding: 36px;
   position: relative;
+  isolation: isolate;
   will-change: transform, box-shadow;
   transition: border-color 0.6s ease, box-shadow 0.6s ease, transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.6s ease;
 }
-.profile-card { grid-column: 1; text-align: center; position: sticky; top: 24px; padding: 36px 28px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.profile-card > *:not(.card-bg-glow), .details-card > *:not(.card-bg-glow), .webauthn-card > *:not(.card-bg-glow), .social-card > *:not(.card-bg-glow), .consents-card > *:not(.card-bg-glow), .activities-card > *:not(.card-bg-glow) { position: relative; z-index: 1; }
+.profile-card { grid-column: 1; text-align: center; position: sticky; top: 24px; padding: 36px 28px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+/* 右侧内容卡片保留 overflow:hidden 用于裁剪光斑 */
+.details-card, .webauthn-card, .social-card, .consents-card, .activities-card { overflow: hidden; }
 
 .profile-card:hover, .details-card:hover, .webauthn-card:hover,
 .social-card:hover, .consents-card:hover, .activities-card:hover {
@@ -1141,8 +1361,9 @@ function base64URLToBuffer(base64url: string) {
 }
 .user-email { font-size: 14px; color: #6B7280; margin-bottom: 20px; }
 .role-badge {
-  display: inline-block; padding: 6px 18px; border-radius: 50px;
+  display: inline-flex; align-items: center; justify-content: center; padding: 6px 18px; border-radius: 50px;
   font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;
+  line-height: 1.2; white-space: nowrap;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .role-badge:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -1192,16 +1413,18 @@ function base64URLToBuffer(base64url: string) {
 
 .detail-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 0;
+  padding: 14px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-radius: 8px;
+  margin-bottom: 4px;
   transition: all 0.5s ease;
 }
 .detail-row:hover {
-  padding-left: 10px;
-  border-bottom-color: rgba(230,57,70,0.1);
+  background: rgba(255,255,255,0.03);
+  padding-left: 22px;
+  border-bottom-color: transparent;
 }
-.detail-row:last-child { border-bottom: none; }
-.detail-row:hover:last-child { border-bottom: none; }
+.detail-row:last-child { border-bottom: 1px solid rgba(255,255,255,0.03); }
 .detail-label { font-size: 15px; color: #6B7280; transition: color 0.5s ease; }
 .detail-row:hover .detail-label { color: #9CA3AF; }
 .detail-value { font-size: 15px; color: #E5E7EB; font-weight: 600; transition: color 0.5s ease; }
