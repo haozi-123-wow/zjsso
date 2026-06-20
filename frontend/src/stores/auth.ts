@@ -83,7 +83,23 @@ export const useAuthStore = defineStore('auth', () => {
     return apiPost('/api/email/reset-password', { email, reset_code: resetCode, new_password: newPassword, confirm_password: newPassword })
   }
 
+  async function sendLoginCode(email: string, geetest?: { lot_number: string; captcha_output: string; pass_token: string; gen_time: string }) {
+    const body: any = { email }
+    if (geetest) Object.assign(body, geetest)
+    return apiPost('/api/auth/send-login-code', body)
+  }
+
+  async function loginWithCode(email: string, code: string) {
+    const data = await apiPost('/api/auth/login-with-code', { email, code })
+    if (data.access_token) {
+      setTokens(data.access_token, '', data.expires_in)
+      user.value = data.user
+      localStorage.setItem('user', JSON.stringify(data.user))
+    }
+    return data
+  }
+
   initSession()
 
-  return { user, isLoggedIn, login, register, logout, fetchUserInfo, loadUser, sendActivationEmail, sendResetPasswordEmail, verifyActivation, resetPassword }
+  return { user, isLoggedIn, login, register, logout, fetchUserInfo, loadUser, sendActivationEmail, sendResetPasswordEmail, verifyActivation, resetPassword, sendLoginCode, loginWithCode }
 })

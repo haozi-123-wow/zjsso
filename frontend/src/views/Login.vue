@@ -19,44 +19,98 @@
         </div>
 
         <div v-if="activeTab === 'login' && !totpStep">
-          <form class="auth-form" @submit.prevent="handleLogin">
-            <div class="form-group">
-              <label class="form-label">用户名 / 邮箱</label>
-              <input v-model="loginForm.username" type="text" class="form-input" placeholder="请输入用户名或邮箱" required />
+          <!-- 密码登录 -->
+          <template v-if="loginMode === 'password'">
+            <form class="auth-form" @submit.prevent="handleLogin">
+              <div class="form-group">
+                <label class="form-label">用户名 / 邮箱</label>
+                <input v-model="loginForm.username" type="text" class="form-input" placeholder="请输入用户名或邮箱" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">密码</label>
+                <input v-model="loginForm.password" type="password" class="form-input" placeholder="请输入密码" required />
+              </div>
+              <button type="submit" class="btn-submit" :disabled="loading">
+                <svg v-if="loading" class="btn-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                </svg>
+                {{ loading ? '验证中...' : '登录' }}
+              </button>
+            </form>
+
+            <div v-if="securityNotice" class="security-notice">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="notice-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>{{ securityNotice.message }}</span>
             </div>
-            <div class="form-group">
-              <label class="form-label">密码</label>
-              <input v-model="loginForm.password" type="password" class="form-input" placeholder="请输入密码" required />
+
+            <div class="auth-divider"><span>其他方式</span></div>
+
+            <div class="social-btns">
+              <button type="button" class="btn-social" @click="handleGithubLogin" :disabled="githubLoading">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="btn-icon"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                GitHub 登录
+              </button>
+              <button type="button" class="btn-social" @click="handleQQLogin" :disabled="qqLoading">
+                <svg viewBox="0 0 1024 1024" fill="currentColor" class="btn-icon"><path d="M802.952533 341.265067C798.378667 166.229333 673.792 34.747733 512.136533 34.133333 350.208 34.747733 225.621333 166.229333 221.047467 341.1968a154.897067 154.897067 0 0 0-29.696 117.623467C140.629333 520.260267 107.861333 582.656 102.673067 654.7456c-1.6384 34.269867 4.096 70.2464 19.2512 90.862933 25.8048 35.157333 62.190933 25.668267 93.047466-6.485333 4.778667 9.079467 10.0352 18.363733 15.906134 27.8528-47.035733 32.904533-64.3072 95.163733-36.181334 141.312 23.210667 38.0928 70.519467 59.665067 133.666134 59.665067 87.927467 0 146.773333-19.182933 183.637333-51.2 37.819733 32.290133 96.324267 51.2 183.637333 51.2 63.146667 0 110.455467-21.572267 133.597867-59.5968 28.125867-46.216533 10.922667-108.475733-36.181333-141.380267 5.9392-9.557333 11.264-18.773333 15.9744-27.8528 30.856533 32.085333 67.242667 41.642667 93.047466 6.485333 15.223467-20.6848 20.957867-56.661333 19.319467-90.112-5.188267-72.840533-37.956267-135.304533-88.746667-196.608a154.965333 154.965333 0 0 0-29.696-117.623466z m49.152 343.586133a152.234667 152.234667 0 0 1-19.2512-32.426667l-39.1168-86.698666-24.917333 91.818666c-7.7824 28.740267-24.849067 63.488-53.998933 103.424l-30.446934 41.642667 50.176 11.741867c33.1776 7.7824 47.445333 40.277333 36.386134 58.504533-9.489067 15.5648-34.2016 26.8288-75.3664 26.8288-76.1856 0-119.466667-15.428267-142.336-37.6832a55.978667 55.978667 0 0 0-41.1648-16.042667 56.661333 56.661333 0 0 0-42.120534 16.861867c-22.1184 21.435733-65.3312 36.864-141.585066 36.864-41.096533 0-65.877333-11.264-75.298134-26.8288-11.0592-18.158933 3.208533-50.722133 36.386134-58.504533l50.176-11.741867-30.446934-41.642667c-29.149867-39.867733-46.216533-74.683733-53.998933-103.424l-24.917333-91.818666-39.1168 86.698666a152.1664 152.1664 0 0 1-19.2512 32.426667 157.4912 157.4912 0 0 1-1.092267-26.0096c4.164267-58.368 35.293867-113.322667 83.899733-169.096533l13.858134-15.9744-8.055467-19.524267c-6.144-14.9504-2.730667-54.340267 18.8416-76.049067l10.8544-10.922666-1.024-15.36c0-144.1792 97.006933-249.0368 222.958933-249.514667 125.610667 0.477867 222.685867 105.335467 222.685867 248.763733 0 1.092267-1.024 16.110933-1.024 16.110934l10.8544 10.922666c21.572267 21.7088 25.053867 61.166933 18.8416 75.9808l-8.123733 19.592534 13.9264 15.9744c48.469333 55.569067 79.598933 110.523733 83.899733 169.437866 0.4096 8.533333-0.136533 17.749333-1.092267 25.668267z"/></svg>
+                QQ 登录
+              </button>
+              <button type="button" class="btn-social btn-passkey" @click="handleWebAuthnLogin" :disabled="webauthnLoading">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                通行密钥登录
+              </button>
+              <button type="button" class="btn-social" @click="switchToEmailCode">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                邮箱验证码登录
+              </button>
             </div>
-            <button type="submit" class="btn-submit" :disabled="loading">
-              <svg v-if="loading" class="btn-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
-              </svg>
-              {{ loading ? '验证中...' : '登录' }}
-            </button>
-          </form>
+          </template>
 
-          <div v-if="securityNotice" class="security-notice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="notice-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>{{ securityNotice.message }}</span>
-          </div>
+          <!-- 邮箱验证码登录 -->
+          <template v-if="loginMode === 'email_code'">
+            <div class="email-code-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="email-code-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <h3 class="email-code-title">邮箱验证码登录</h3>
+              <p class="email-code-desc">输入邮箱接收验证码，快捷登录</p>
+            </div>
 
-          <div class="auth-divider"><span>其他方式</span></div>
+            <template v-if="emailCodeStep === 'send'">
+              <form class="auth-form" @submit.prevent="sendEmailCode">
+                <div class="form-group">
+                  <label class="form-label">邮箱</label>
+                  <input v-model="emailCodeForm.email" type="email" class="form-input" placeholder="请输入邮箱地址" required />
+                </div>
+                <button type="submit" class="btn-submit" :disabled="emailCodeSending">
+                  <svg v-if="emailCodeSending" class="btn-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                  </svg>
+                  {{ emailCodeSending ? '发送中...' : '发送验证码' }}
+                </button>
+              </form>
+            </template>
 
-          <div class="social-btns">
-            <button type="button" class="btn-social" @click="handleGithubLogin" :disabled="githubLoading">
-              <svg viewBox="0 0 24 24" fill="currentColor" class="btn-icon"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-              GitHub 登录
-            </button>
-            <button type="button" class="btn-social" @click="handleQQLogin" :disabled="qqLoading">
-              <svg viewBox="0 0 1024 1024" fill="currentColor" class="btn-icon"><path d="M802.952533 341.265067C798.378667 166.229333 673.792 34.747733 512.136533 34.133333 350.208 34.747733 225.621333 166.229333 221.047467 341.1968a154.897067 154.897067 0 0 0-29.696 117.623467C140.629333 520.260267 107.861333 582.656 102.673067 654.7456c-1.6384 34.269867 4.096 70.2464 19.2512 90.862933 25.8048 35.157333 62.190933 25.668267 93.047466-6.485333 4.778667 9.079467 10.0352 18.363733 15.906134 27.8528-47.035733 32.904533-64.3072 95.163733-36.181334 141.312 23.210667 38.0928 70.519467 59.665067 133.666134 59.665067 87.927467 0 146.773333-19.182933 183.637333-51.2 37.819733 32.290133 96.324267 51.2 183.637333 51.2 63.146667 0 110.455467-21.572267 133.597867-59.5968 28.125867-46.216533 10.922667-108.475733-36.181333-141.380267 5.9392-9.557333 11.264-18.773333 15.9744-27.8528 30.856533 32.085333 67.242667 41.642667 93.047466 6.485333 15.223467-20.6848 20.957867-56.661333 19.319467-90.112-5.188267-72.840533-37.956267-135.304533-88.746667-196.608a154.965333 154.965333 0 0 0-29.696-117.623466z m49.152 343.586133a152.234667 152.234667 0 0 1-19.2512-32.426667l-39.1168-86.698666-24.917333 91.818666c-7.7824 28.740267-24.849067 63.488-53.998933 103.424l-30.446934 41.642667 50.176 11.741867c33.1776 7.7824 47.445333 40.277333 36.386134 58.504533-9.489067 15.5648-34.2016 26.8288-75.3664 26.8288-76.1856 0-119.466667-15.428267-142.336-37.6832a55.978667 55.978667 0 0 0-41.1648-16.042667 56.661333 56.661333 0 0 0-42.120534 16.861867c-22.1184 21.435733-65.3312 36.864-141.585066 36.864-41.096533 0-65.877333-11.264-75.298134-26.8288-11.0592-18.158933 3.208533-50.722133 36.386134-58.504533l50.176-11.741867-30.446934-41.642667c-29.149867-39.867733-46.216533-74.683733-53.998933-103.424l-24.917333-91.818666-39.1168 86.698666a152.1664 152.1664 0 0 1-19.2512 32.426667 157.4912 157.4912 0 0 1-1.092267-26.0096c4.164267-58.368 35.293867-113.322667 83.899733-169.096533l13.858134-15.9744-8.055467-19.524267c-6.144-14.9504-2.730667-54.340267 18.8416-76.049067l10.8544-10.922666-1.024-15.36c0-144.1792 97.006933-249.0368 222.958933-249.514667 125.610667 0.477867 222.685867 105.335467 222.685867 248.763733 0 1.092267-1.024 16.110933-1.024 16.110934l10.8544 10.922666c21.572267 21.7088 25.053867 61.166933 18.8416 75.9808l-8.123733 19.592534 13.9264 15.9744c48.469333 55.569067 79.598933 110.523733 83.899733 169.437866 0.4096 8.533333-0.136533 17.749333-1.092267 25.668267z"/></svg>
-              QQ 登录
-            </button>
-            <button type="button" class="btn-social btn-passkey" @click="handleWebAuthnLogin" :disabled="webauthnLoading">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-              通行密钥登录
-            </button>
-          </div>
+            <template v-else>
+              <form class="auth-form" @submit.prevent="loginWithEmailCode">
+                <div class="form-group">
+                  <label class="form-label">验证码</label>
+                  <div class="code-input-row">
+                    <input v-model="emailCodeForm.code" type="text" class="form-input code-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+                    <button type="button" class="btn-resend" :disabled="emailCodeResendCooldown > 0" @click="resendEmailCode">
+                      {{ emailCodeResendCooldown > 0 ? `${emailCodeResendCooldown}s` : '重新发送' }}
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" class="btn-submit" :disabled="emailCodeLoggingIn">
+                  <svg v-if="emailCodeLoggingIn" class="btn-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+                  </svg>
+                  {{ emailCodeLoggingIn ? '验证中...' : '登录' }}
+                </button>
+                <p class="email-code-hint">已发送至 {{ emailCodeForm.email }}</p>
+              </form>
+            </template>
+
+            <button class="totp-back" @click="switchToPassword">返回密码登录</button>
+          </template>
         </div>
 
         <div v-if="activeTab === 'login' && totpStep" class="totp-verify">
@@ -161,6 +215,7 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const activeTab = ref<'login' | 'register' | 'reset'>('login')
+const loginMode = ref<'password' | 'email_code'>('password')
 const loading = ref(false)
 const regLoading = ref(false)
 const resetLoading = ref(false)
@@ -173,6 +228,13 @@ const loginForm = reactive({ username: '', password: '' })
 const regForm = reactive({ username: '', email: '', password: '', confirm_password: '', qq: '' })
 const resetStep = ref(1)
 const resetForm = reactive({ email: '', code: '', password: '' })
+
+const emailCodeStep = ref<'send' | 'verify'>('send')
+const emailCodeForm = reactive({ email: '', code: '' })
+const emailCodeSending = ref(false)
+const emailCodeLoggingIn = ref(false)
+const emailCodeResendCooldown = ref(0)
+let emailCodeResendTimer: ReturnType<typeof setInterval> | null = null
 
 const toast = reactive({ show: false, message: '', type: 'info' })
 const redirecting = ref(false)
@@ -376,6 +438,96 @@ async function handleWebAuthnLogin() {
   finally { webauthnLoading.value = false }
 }
 
+function switchToEmailCode() {
+  loginMode.value = 'email_code'
+  emailCodeStep.value = 'send'
+  emailCodeForm.email = ''
+  emailCodeForm.code = ''
+}
+
+function switchToPassword() {
+  loginMode.value = 'password'
+  emailCodeStep.value = 'send'
+  emailCodeForm.email = ''
+  emailCodeForm.code = ''
+  if (emailCodeResendTimer) {
+    clearInterval(emailCodeResendTimer)
+    emailCodeResendTimer = null
+  }
+  emailCodeResendCooldown.value = 0
+}
+
+function startResendCooldown() {
+  emailCodeResendCooldown.value = 60
+  if (emailCodeResendTimer) clearInterval(emailCodeResendTimer)
+  emailCodeResendTimer = setInterval(() => {
+    emailCodeResendCooldown.value--
+    if (emailCodeResendCooldown.value <= 0) {
+      if (emailCodeResendTimer) clearInterval(emailCodeResendTimer)
+      emailCodeResendTimer = null
+    }
+  }, 1000)
+}
+
+async function sendEmailCode() {
+  if (!emailCodeForm.email) { showToast('请输入邮箱'); return }
+  emailCodeSending.value = true
+  try {
+    const geetest = await triggerGeetest()
+    const data = await auth.sendLoginCode(emailCodeForm.email, geetest)
+    emailCodeStep.value = 'verify'
+    showToast('如果该邮箱已注册，验证码已发送', 'success')
+    startResendCooldown()
+  } catch (e: any) {
+    showToast(e.message || '发送失败')
+  } finally {
+    emailCodeSending.value = false
+  }
+}
+
+async function resendEmailCode() {
+  if (emailCodeResendCooldown.value > 0) return
+  emailCodeSending.value = true
+  try {
+    const geetest = await triggerGeetest()
+    await auth.sendLoginCode(emailCodeForm.email, geetest)
+    showToast('如果该邮箱已注册，验证码已发送', 'success')
+    startResendCooldown()
+  } catch (e: any) {
+    showToast(e.message || '发送失败')
+  } finally {
+    emailCodeSending.value = false
+  }
+}
+
+async function loginWithEmailCode() {
+  if (!emailCodeForm.code) { showToast('请输入验证码'); return }
+  if (emailCodeForm.code.length < 4) { showToast('验证码不完整'); return }
+  emailCodeLoggingIn.value = true
+  try {
+    const data = await auth.loginWithCode(emailCodeForm.email, emailCodeForm.code)
+    if (data.require_2fa) {
+      tempToken.value = data.temp_token
+      tempUser.value = data.user
+      totpStep.value = true
+      return
+    }
+    if (data.access_token) {
+      if (data.security_notice) securityNotice.value = data.security_notice
+      const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+      const redirect = params.get('redirect') || '#/profile'
+      redirecting.value = true
+      setTimeout(() => { window.location.hash = redirect }, 400)
+    } else {
+      showToast(data.message || '登录失败')
+    }
+  } catch (e: any) {
+    showToast(e.message || '登录失败')
+  } finally {
+    emailCodeLoggingIn.value = false
+  }
+}
+
 function bufferToBase64URL(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer); let binary = ''
   for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
@@ -479,6 +631,19 @@ onMounted(async () => {
   font-size: 14px; color: #6B7280;
   letter-spacing: 2px;
 }
+
+.email-code-header { text-align: center; padding: 8px 0 20px; }
+.email-code-icon { width: 40px; height: 40px; color: #E63946; margin-bottom: 12px; }
+.email-code-title { font-size: 18px; font-weight: 600; color: #F5F5F5; margin-bottom: 4px; }
+.email-code-desc { font-size: 13px; color: #6B7280; margin: 0; line-height: 1.5; }
+
+.code-input-row { display: flex; gap: 8px; }
+.code-input { flex: 1; text-align: center; font-size: 24px !important; letter-spacing: 8px; font-weight: 700; font-family: 'Courier New', monospace !important; }
+.btn-resend { flex-shrink: 0; padding: 0 16px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; background: rgba(255, 255, 255, 0.03); color: #9CA3AF; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.4s ease; white-space: nowrap; }
+.btn-resend:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); color: #E5E7EB; border-color: rgba(255, 255, 255, 0.1); }
+.btn-resend:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.email-code-hint { text-align: center; font-size: 12px; color: #4B5058; margin: 12px 0 0; }
 
 @media (max-width: 768px) { .auth-card { padding: 24px 20px; } }
 </style>

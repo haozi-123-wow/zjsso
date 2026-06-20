@@ -9,7 +9,7 @@ const User = require('../models/User');
 const Group = require('../models/Group');
 const geetestService = require('../services/GeetestService');
 const emailService = require('../services/EmailService');
-const { createRateLimiter } = require('../middleware/rateLimiter');
+const { createRateLimiter, createEmailRateLimiter } = require('../middleware/rateLimiter');
 const { authenticate } = require('../middleware/auth');
 const { getIpLocation, getClientIp } = require('../services/IpLocationService');
 const { log, ACTION } = require('../services/ActivityLogService');
@@ -405,6 +405,167 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.status(500).json({
       error: 'server_error',
       message: '登录失败，请稍后再试'
+    });
+  }
+});
+
+// 邮箱验证码登录：发送验证码
+const loginCodeRateLimiter = createEmailRateLimiter();
+
+router.post('/send-login-code', loginCodeRateLimiter, async (req, res) => {
+  try {
+    const { email, lot_number = '', captcha_output = '', pass_token = '', gen_time = '' } = req.body;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({
+        error: 'invalid_email',
+        message: '邮箱格式不正确',
+        statusCode: 400
+      });
+    }
+
+    const geetestResult = await geetestService.validate({
+      lot_number, captcha_output, pass_token, gen_time
+    });
+
+    if (geetestResult.result !== 'success') {
+      return res.status(403).json({
+        error: 'geetest_failed',
+        message: '行为验证未通过，请重试',
+        statusCode: 403
+      });
+    }
+
+    // 不区分用户是否存在，统一返回泛化响应以防止用户枚举
+    const user = await User.findByEmail(email);
+    if (user && user.enabled && user.email_verified) {
+      const code = emailService.generateCode();
+      await emailService.storeCode(email, code, 'login', 600);
+      await emailService.sendVerificationEmail(email, code);
+    }
+
+    res.json({
+      message: '如果该邮箱已注册，验证码已发送',
+      expires_in: 600
+    });
+  } catch (err) {
+    console.error('Send login code error:', err);
+    res.status(500).json({
+      error: 'server_error',
+      message: '发送验证码失败',
+      statusCode: 500
+    });
+  }
+});
+
+// 邮箱验证码登录：验证码登录
+router.post('/login-with-code', loginLimiter, async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        message: '邮箱和验证码不能为空',
+        statusCode: 400
+      });
+    }
+
+    const verification = await emailService.verifyCode(email, code, 'login');
+    if (!verification.valid) {
+      return res.status(400).json({
+        error: 'invalid_code',
+        message: verification.reason || '验证码错误或已过期',
+        statusCode: 400
+      });
+    }
+
+    const user = await User.findByEmail(email);
+    if (!user) {
+      return res.status(401).json({
+        error: 'invalid_grant',
+        message: '登录失败，请重试',
+        statusCode: 401
+      });
+    }
+
+    if (!user.enabled) {
+      return res.status(403).json({
+        error: 'account_disabled',
+        message: '账号已被禁用',
+        statusCode: 403
+      });
+    }
+
+    const loginIp = getClientIp(req);
+    const loginIpLocation = await getIpLocation(loginIp);
+
+    const prevIpLocation = user.last_login_ip_location;
+    let securityNotice = null;
+    if (prevIpLocation && loginIpLocation && prevIpLocation !== loginIpLocation) {
+      securityNotice = {
+        message: '本次登录 IP 归属地与上次不同，如非本人操作请及时修改密码',
+        previous_location: prevIpLocation,
+        current_location: loginIpLocation,
+        previous_ip: user.last_login_ip,
+        current_ip: loginIp
+      };
+    }
+
+    await db.query(
+      `UPDATE users SET last_login_ip = ?, last_login_ip_location = ?, last_login_at = NOW() WHERE id = ?`,
+      [loginIp, loginIpLocation, user.id]
+    );
+
+    const tokens = await generateTokens(user);
+
+    // TOTP 2FA 检查
+    const totpRows = await db.query('SELECT enabled FROM user_totp WHERE user_id = ? AND enabled = TRUE', [user.id]);
+    if (totpRows.length > 0) {
+      const tempToken = generateTempToken(user.id);
+      return res.json({
+        require_2fa: true,
+        temp_token: tempToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          display_name: user.display_name,
+          picture: user.picture,
+          role: user.role || 'user'
+        }
+      });
+    }
+
+    log(user.id, ACTION.LOGIN, {
+      method: 'email_code',
+      security_notice: !!securityNotice
+    }, req, loginIpLocation);
+
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
+    res.json({
+      access_token: tokens.accessToken,
+      token_type: 'Bearer',
+      expires_in: config.jwt.expiresIn,
+      id_token: tokens.idToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        picture: user.picture,
+        role: user.role || 'user',
+        qq: user.qq
+      },
+      ...(securityNotice ? { security_notice: securityNotice } : {})
+    });
+  } catch (err) {
+    console.error('Login with code error:', err);
+    res.status(500).json({
+      error: 'server_error',
+      message: '登录失败，请稍后再试',
+      statusCode: 500
     });
   }
 });
