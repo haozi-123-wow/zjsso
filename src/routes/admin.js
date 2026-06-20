@@ -494,4 +494,119 @@ router.post('/users/:id/clear-2fa', authenticate, requireRole('admin'), async (r
   }
 });
 
+// 获取用户活动日志
+router.get('/users/:id/activity-logs', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: '用户不存在' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = parseInt(req.query.offset) || 0;
+    const { action } = req.query;
+
+    let whereClause = 'WHERE user_id = ?';
+    const params = [req.params.id];
+
+    if (action) {
+      whereClause += ' AND action = ?';
+      params.push(action);
+    }
+
+    const rows = await db.query(
+      `SELECT id, action, detail, ip_address, ip_location, user_agent, created_at
+       FROM user_activity_log ${whereClause}
+       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    const countResult = await db.query(
+      `SELECT COUNT(*) as total FROM user_activity_log ${whereClause}`,
+      params
+    );
+
+    const logs = rows.map(r => ({
+      id: r.id,
+      action: r.action,
+      detail: r.detail ? (typeof r.detail === 'string' ? (() => { try { return JSON.parse(r.detail) } catch { return r.detail } })() : r.detail) : null,
+      ip_address: r.ip_address,
+      ip_location: r.ip_location,
+      user_agent: r.user_agent,
+      created_at: r.created_at
+    }));
+
+    res.json({ logs, total: countResult[0].total });
+  } catch (err) {
+    console.error('Get user activity logs error:', err);
+    res.status(500).json({ error: 'server_error', message: '获取用户活动日志失败' });
+  }
+});
+
+// 获取用户授权列表
+router.get('/users/:id/consents', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: '用户不存在' });
+    }
+
+    const rows = await db.query(
+      `SELECT uc.id, uc.client_id, uc.scopes, uc.granted_at,
+              c.client_name, c.client_description, c.logo_uri, c.client_id as client_key
+       FROM user_consents uc
+       INNER JOIN clients c ON c.id = uc.client_id
+       WHERE uc.user_id = ?
+       ORDER BY uc.granted_at DESC`,
+      [req.params.id]
+    );
+
+    const consents = rows.map(r => ({
+      id: r.id,
+      client_id: r.client_id,
+      client_key: r.client_key,
+      client_name: r.client_name,
+      client_description: r.client_description,
+      logo_uri: r.logo_uri,
+      scopes: typeof r.scopes === 'string' ? JSON.parse(r.scopes) : r.scopes,
+      granted_at: r.granted_at
+    }));
+
+    res.json({ consents });
+  } catch (err) {
+    console.error('Get user consents error:', err);
+    res.status(500).json({ error: 'server_error', message: '获取用户授权列表失败' });
+  }
+});
+
+// 撤销用户授权
+router.delete('/users/:id/consents/:consentId', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'not_found', message: '用户不存在' });
+    }
+
+    const result = await db.query(
+      'DELETE FROM user_consents WHERE id = ? AND user_id = ?',
+      [req.params.consentId, req.params.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'not_found', message: '授权记录不存在' });
+    }
+
+    log(req.user.id, ACTION.REVOKE_CONSENT, {
+      target_user: req.params.id,
+      target_username: user.username,
+      consent_id: req.params.consentId
+    }, req);
+
+    res.json({ message: '已撤销授权' });
+  } catch (err) {
+    console.error('Revoke user consent error:', err);
+    res.status(500).json({ error: 'server_error', message: '撤销授权失败' });
+  }
+});
+
 module.exports = router;

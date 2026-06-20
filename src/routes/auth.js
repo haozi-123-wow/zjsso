@@ -6,6 +6,7 @@ const db = require('../database/connection');
 const { getRedisClient } = require('../database/redis');
 const config = require('../config');
 const User = require('../models/User');
+const Group = require('../models/Group');
 const geetestService = require('../services/GeetestService');
 const emailService = require('../services/EmailService');
 const { createRateLimiter } = require('../middleware/rateLimiter');
@@ -242,6 +243,17 @@ router.post('/register', registerLimiter, async (req, res) => {
       register_ip_location: registerIpLocation
     });
 
+    // 自动加入默认组
+    try {
+      const defaultGroups = await Group.getDefaultGroups();
+      for (const group of defaultGroups) {
+        await Group.addUserToGroup(user.id, group.id);
+      }
+    } catch (groupErr) {
+      console.error('Add user to default groups error:', groupErr);
+      // 不影响注册流程
+    }
+
     const activationCode = emailService.generateCode();
     await emailService.storeCode(email, activationCode, 'activation');
     await emailService.sendActivationEmail(email, activationCode);
@@ -444,7 +456,7 @@ router.post('/refresh', async (req, res) => {
     const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
 
     const tokens = await db.query(
-      `SELECT rt.*, u.username, u.email, u.display_name, u.picture
+      `SELECT rt.*, u.username, u.email, u.display_name, u.picture, u.role
        FROM refresh_tokens rt
        INNER JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = ? AND rt.revoked = FALSE AND rt.used = FALSE AND rt.expires_at > NOW()`,
@@ -471,7 +483,8 @@ router.post('/refresh', async (req, res) => {
       username: tokenRecord.username,
       email: tokenRecord.email,
       display_name: tokenRecord.display_name,
-      picture: tokenRecord.picture
+      picture: tokenRecord.picture,
+      role: tokenRecord.role
     };
 
     const newTokens = await generateTokens(user);
@@ -544,7 +557,8 @@ router.post('/session', async (req, res) => {
       username: tokenRecord.username,
       email: tokenRecord.email,
       display_name: tokenRecord.display_name,
-      picture: tokenRecord.picture
+      picture: tokenRecord.picture,
+      role: tokenRecord.role
     };
 
     const newTokens = await generateTokens(user);

@@ -95,24 +95,24 @@ Response: { ...group }
 ### 阶段一：数据库
 
 - [x] `src/database/update_groups_default.sql` — groups 表增加 `is_default` 字段
-- [ ] 执行数据库迁移（手动执行 SQL 或通过迁移脚本）
+- [x] 据库迁移（手动执行 SQL 或通过迁移脚本）
 
 ### 阶段二：后端模型更新
 
-- [ ] `src/models/Group.js` — create/update 方法支持 `is_default` 字段
-- [ ] `src/database/schema.sql` — 同步更新 groups 表定义
+- [x] `src/models/Group.js` — create/update 方法支持 `is_default` 字段
+- [x] `src/database/schema.sql` — 同步更新 groups 表定义
 
 ### 阶段三：后端 API 开发
 
-- [ ] `src/routes/admin.js` — 新增 `GET /api/admin/users/:id/activity-logs` 获取用户活动日志
+- [x] `src/routes/admin.js` — 新增 `GET /api/admin/users/:id/activity-logs` 获取用户活动日志
   - Query 参数：limit, offset, action（可选筛选）
   - 需要 admin 角色权限
   - 调用 ActivityLogService 查询
-- [ ] `src/routes/admin.js` — 新增 `DELETE /api/admin/users/:id/consents/:clientId` 撤销用户授权
+- [x] `src/routes/admin.js` — 新增 `DELETE /api/admin/users/:id/consents/:clientId` 撤销用户授权
   - 从 user_consents 表删除对应记录
   - 记录操作日志
-- [ ] `src/routes/groups.js` — PUT /api/groups/:id 支持 `is_default` 字段
-- [ ] `src/routes/auth.js` — 注册流程中自动加入 `is_default=1` 的组
+- [x] `src/routes/groups.js` — PUT /api/groups/:id 支持 `is_default` 字段
+- [x] `src/routes/auth.js` — 注册流程中自动加入 `is_default=1` 的组
   - 用户注册成功后查询默认组
   - 自动将用户添加到所有默认组
 
@@ -120,23 +120,23 @@ Response: { ...group }
 
 #### 4.1 用户详情模态框
 
-- [ ] 用户列表增加"详情"按钮
-- [ ] 新建用户详情模态框组件
-- [ ] 清除2FA功能（调用已有 `POST /api/users/:id/clear-2fa`）
-- [ ] 已授权客户端列表
+- [x] 用户列表增加"详情"按钮
+- [x] 新建用户详情模态框组件
+- [x] 清除2FA功能（调用已有 `POST /api/users/:id/clear-2fa`）
+- [x] 已授权客户端列表
   - 调用新 API 获取用户授权列表
   - 显示客户端名称、授权时间、scope
   - 支持单个撤销操作
-- [ ] 活动日志列表
+- [x] 活动日志列表
   - 分页展示日志记录
   - 支持按操作类型筛选
   - 显示时间、操作类型、IP、详情
 
 #### 4.2 用户组管理改进
 
-- [ ] 创建/编辑组表单增加"默认组"开关
-- [ ] 组列表显示是否为默认组（Badge 标签）
-- [ ] 成员管理模态框改进：
+- [x] 创建/编辑组表单增加"默认组"开关
+- [x] 组列表显示是否为默认组（Badge 标签）
+- [x] 成员管理模态框改进：
   - 用户选择器改为搜索式（支持按用户名/邮箱搜索）
   - 支持批量选择用户
   - 一键添加选中用户到组

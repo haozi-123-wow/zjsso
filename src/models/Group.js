@@ -3,11 +3,11 @@ const db = require('../database/connection');
 
 class Group {
   // 创建组
-  static async create({ name, description }) {
+  static async create({ name, description, is_default }) {
     const id = uuidv4();
     await db.query(
-      'INSERT INTO groups (id, name, description) VALUES (?, ?, ?)',
-      [id, name, description || null]
+      'INSERT INTO groups (id, name, description, is_default) VALUES (?, ?, ?, ?)',
+      [id, name, description || null, !!is_default]
     );
     return this.findById(id);
   }
@@ -29,8 +29,13 @@ class Group {
     return db.query('SELECT * FROM groups ORDER BY created_at DESC');
   }
 
+  // 获取所有默认组（新用户注册时自动加入）
+  static async getDefaultGroups() {
+    return db.query('SELECT * FROM groups WHERE is_default = TRUE');
+  }
+
   // 更新组
-  static async update(id, { name, description }) {
+  static async update(id, { name, description, is_default }) {
     const updates = [];
     const values = [];
 
@@ -41,6 +46,10 @@ class Group {
     if (description !== undefined) {
       updates.push('description = ?');
       values.push(description);
+    }
+    if (is_default !== undefined) {
+      updates.push('is_default = ?');
+      values.push(!!is_default);
     }
     if (updates.length === 0) return this.findById(id);
 

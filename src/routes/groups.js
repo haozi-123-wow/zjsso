@@ -28,7 +28,7 @@ router.get('/groups', async (req, res) => {
 // POST /api/groups - 创建组
 router.post('/groups', async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, is_default } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'invalid_request', message: '组名称不能为空' });
     }
@@ -36,7 +36,7 @@ router.post('/groups', async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'duplicate', message: '组名称已存在' });
     }
-    const group = await Group.create({ name: name.trim(), description });
+    const group = await Group.create({ name: name.trim(), description, is_default });
     res.status(201).json({ ...group, user_count: 0 });
   } catch (err) {
     console.error('Create group error:', err);
@@ -66,7 +66,7 @@ router.put('/groups/:id', async (req, res) => {
     if (!group) {
       return res.status(404).json({ error: 'not_found', message: '用户组不存在' });
     }
-    const { name, description } = req.body;
+    const { name, description, is_default } = req.body;
     if (name !== undefined && !name.trim()) {
       return res.status(400).json({ error: 'invalid_request', message: '组名称不能为空' });
     }
@@ -79,7 +79,8 @@ router.put('/groups/:id', async (req, res) => {
     }
     const updated = await Group.update(req.params.id, {
       name: name?.trim(),
-      description
+      description,
+      is_default
     });
     const users = await Group.getGroupUsers(req.params.id);
     res.json({ ...updated, user_count: users.length, users });

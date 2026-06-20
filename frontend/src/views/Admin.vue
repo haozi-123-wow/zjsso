@@ -511,6 +511,7 @@
             </span>
             <span class="th-login">{{ u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '-' }}</span>
             <span class="th-actions">
+              <button class="btn-table btn-info" @click="openUserDetail(u)">详情</button>
               <button class="btn-table btn-edit" @click="editUser(u)">编辑</button>
               <button :class="['btn-table', u.enabled ? 'btn-warn' : 'btn-success']" @click="toggleUserStatus(u)">
                 {{ u.enabled ? '禁用' : '启用' }}
@@ -525,6 +526,126 @@
           <button class="page-btn" :disabled="currentPage <= 1" @click="currentPage--; loadUsers()">上一页</button>
           <span class="page-info">第 {{ currentPage }} / {{ Math.ceil(totalUsers / pageSize) }} 页（共 {{ totalUsers }} 条）</span>
           <button class="page-btn" :disabled="currentPage >= Math.ceil(totalUsers / pageSize)" @click="currentPage++; loadUsers()">下一页</button>
+        </div>
+      </div>
+
+      <!-- 用户详情模态框 -->
+      <div class="modal-overlay" v-if="showUserDetail" @click.self="closeUserDetail">
+        <div class="modal modal-detail">
+          <div class="modal-header">
+            <h4>用户详情 - {{ userDetailTarget?.username }}</h4>
+            <button class="modal-close" @click="closeUserDetail">&times;</button>
+          </div>
+          <div class="modal-body">
+            <!-- Tabs -->
+            <div class="detail-tabs">
+              <button :class="['detail-tab', { active: detailTab === 'actions' }]" @click="detailTab = 'actions'">管理操作</button>
+              <button :class="['detail-tab', { active: detailTab === 'consents' }]" @click="detailTab = 'consents'">已授权 ({{ userConsents.length }})</button>
+              <button :class="['detail-tab', { active: detailTab === 'logs' }]" @click="detailTab = 'logs'">活动日志</button>
+            </div>
+
+            <!-- 管理操作 -->
+            <div v-if="detailTab === 'actions'" class="detail-content">
+              <div class="detail-section">
+                <h5 class="section-label">用户信息</h5>
+                <div class="detail-info-grid">
+                  <div class="info-item"><span class="info-key">用户ID</span><span class="info-val">{{ userDetailTarget?.id }}</span></div>
+                  <div class="info-item"><span class="info-key">邮箱</span><span class="info-val">{{ userDetailTarget?.email }}</span></div>
+                  <div class="info-item"><span class="info-key">显示名</span><span class="info-val">{{ userDetailTarget?.display_name || '-' }}</span></div>
+                  <div class="info-item"><span class="info-key">角色</span><span :class="['role-tag', userDetailTarget?.role]">{{ userDetailTarget?.role }}</span></div>
+                  <div class="info-item"><span class="info-key">状态</span><span class="info-val">{{ userDetailTarget?.enabled ? '启用' : '禁用' }}</span></div>
+                  <div class="info-item"><span class="info-key">所属组</span>
+                    <span class="info-val">
+                      <span v-if="userDetailTarget?.groups?.length === 0 || !userDetailTarget?.groups" class="group-empty">无</span>
+                      <span v-for="g in userDetailTarget?.groups" :key="g.id" class="group-tag">{{ g.name }}</span>
+                    </span>
+                  </div>
+                  <div class="info-item"><span class="info-key">注册IP</span><span class="info-val">{{ userDetailTarget?.register_ip || '-' }} <span v-if="userDetailTarget?.register_ip_location" class="ip-loc">({{ userDetailTarget.register_ip_location }})</span></span></div>
+                  <div class="info-item"><span class="info-key">最后登录</span><span class="info-val">{{ userDetailTarget?.last_login_at ? new Date(userDetailTarget.last_login_at).toLocaleString() : '-' }}</span></div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h5 class="section-label">危险操作</h5>
+                <div class="action-list">
+                  <div class="action-row">
+                    <div class="action-desc">
+                      <strong>清除 2FA 认证</strong>
+                      <p>解除该用户的 TOTP 双因素认证绑定，用户下次登录将不再需要 2FA 验证</p>
+                    </div>
+                    <button class="btn-table btn-warn" @click="clearUser2FA">清除 2FA</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 已授权客户端 -->
+            <div v-else-if="detailTab === 'consents'" class="detail-content">
+              <div v-if="loadingConsents" class="detail-loading">加载中...</div>
+              <div v-else-if="userConsents.length === 0" class="detail-empty">该用户暂未授权任何应用</div>
+              <div v-else class="consent-list">
+                <div v-for="c in userConsents" :key="c.id" class="consent-item">
+                  <img v-if="c.logo_uri" :src="c.logo_uri" class="consent-logo" alt="" />
+                  <div v-else class="consent-logo consent-logo-placeholder">{{ c.client_name?.charAt(0).toUpperCase() }}</div>
+                  <div class="consent-info">
+                    <div class="consent-name">{{ c.client_name }}</div>
+                    <div class="consent-meta">
+                      <span class="consent-time">授权于 {{ new Date(c.granted_at).toLocaleString() }}</span>
+                      <span class="consent-scopes">Scope: {{ Array.isArray(c.scopes) ? c.scopes.join(', ') : c.scopes }}</span>
+                    </div>
+                  </div>
+                  <button class="btn-table btn-danger" @click="revokeConsent(c)">撤销</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 活动日志 -->
+            <div v-else-if="detailTab === 'logs'" class="detail-content">
+              <div class="log-filter">
+                <select v-model="logFilterAction" class="form-input form-input-sm" @change="loadActivityLogs(1)">
+                  <option value="">全部类型</option>
+                  <option value="login">登录</option>
+                  <option value="logout">登出</option>
+                  <option value="register">注册</option>
+                  <option value="change_password">修改密码</option>
+                  <option value="revoke_consent">撤销授权</option>
+                  <option value="register_passkey">注册通行密钥</option>
+                  <option value="delete_passkey">删除通行密钥</option>
+                  <option value="bind_social">绑定社交</option>
+                  <option value="unbind_social">解绑社交</option>
+                  <option value="update_profile">更新资料</option>
+                  <option value="enable_2fa">启用2FA</option>
+                  <option value="disable_2fa">禁用2FA</option>
+                  <option value="admin_clear_2fa">管理员清除2FA</option>
+                  <option value="reset_secret">重置密钥</option>
+                </select>
+              </div>
+              <div v-if="loadingLogs" class="detail-loading">加载中...</div>
+              <div v-else-if="userLogs.length === 0" class="detail-empty">暂无活动日志</div>
+              <div v-else class="log-list">
+                <div v-for="log in userLogs" :key="log.id" class="log-item">
+                  <div class="log-header">
+                    <span :class="['log-action', `log-${log.action}`]">{{ formatLogAction(log.action) }}</span>
+                    <span class="log-time">{{ new Date(log.created_at).toLocaleString() }}</span>
+                  </div>
+                  <div class="log-body">
+                    <div v-if="log.ip_address" class="log-ip">IP: {{ log.ip_address }} <span v-if="log.ip_location" class="ip-loc">({{ log.ip_location }})</span></div>
+                    <div v-if="log.detail" class="log-detail">
+                      <pre>{{ typeof log.detail === 'object' ? JSON.stringify(log.detail, null, 2) : log.detail }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="pagination" v-if="totalLogs > logPageSize">
+                <button class="page-btn" :disabled="logCurrentPage <= 1" @click="loadActivityLogs(logCurrentPage - 1)">上一页</button>
+                <span class="page-info">第 {{ logCurrentPage }} / {{ Math.ceil(totalLogs / logPageSize) }} 页</span>
+                <button class="page-btn" :disabled="logCurrentPage >= Math.ceil(totalLogs / logPageSize)" @click="loadActivityLogs(logCurrentPage + 1)">下一页</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-cancel" @click="closeUserDetail">关闭</button>
+          </div>
         </div>
       </div>
 
@@ -552,6 +673,15 @@
                 <label class="form-label">组描述</label>
                 <textarea v-model="groupForm.description" class="form-input" rows="3" placeholder="选填，描述组用途"></textarea>
               </div>
+              <div class="form-group">
+                <label class="checkbox-label" style="padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:8px">
+                  <input type="checkbox" v-model="groupForm.is_default" />
+                  <span style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-weight:500;color:#E5E7EB">默认组</span>
+                    <span style="font-size:11px;color:#6B7280">新用户注册时将自动加入此组</span>
+                  </span>
+                </label>
+              </div>
             </div>
             <div class="modal-footer">
               <button class="btn-cancel" @click="cancelGroupForm">取消</button>
@@ -571,14 +701,28 @@
             </div>
             <div class="modal-body">
               <div class="form-group">
-                <label class="form-label">添加用户</label>
-                <select v-model="userToAdd" class="form-input">
-                  <option value="">选择用户...</option>
-                  <option v-for="u in availableUsersToAdd" :key="u.id" :value="u.id">
-                    {{ u.username }} ({{ u.email }})
-                  </option>
-                </select>
-                <button class="btn-submit" style="margin-top:8px" :disabled="!userToAdd" @click="addUserToGroup">添加到组</button>
+                <label class="form-label">搜索并添加用户</label>
+                <div class="member-search-row">
+                  <label class="search-input-wrap" style="flex:1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input v-model="memberSearchQuery" class="search-input" style="width:100%" placeholder="搜索用户名/邮箱..." @input="debouncedSearchMembers" />
+                  </label>
+                </div>
+                <div v-if="memberSearchQuery" class="member-search-results">
+                  <div v-if="searchingMembers" style="padding:12px;text-align:center;color:#6B7280;font-size:12px">搜索中...</div>
+                  <div v-else-if="memberSearchResults.length === 0" style="padding:12px;text-align:center;color:#6B7280;font-size:12px">未找到匹配的用户</div>
+                  <template v-else>
+                    <div v-for="u in memberSearchResults" :key="u.id" class="member-search-item" @click="toggleMemberSelection(u)">
+                      <input type="checkbox" :checked="selectedMemberIds.has(u.id)" class="member-checkbox" />
+                      <span class="user-avatar-sm">{{ (u.display_name || u.username).charAt(0).toUpperCase() }}</span>
+                      <span class="member-name">{{ u.display_name || u.username }}</span>
+                      <span class="member-email">{{ u.email }}</span>
+                    </div>
+                    <button class="btn-submit" style="margin-top:8px" :disabled="selectedMemberIds.size === 0" @click="batchAddUsers">
+                      添加选中用户 ({{ selectedMemberIds.size }})
+                    </button>
+                  </template>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">当前成员 ({{ groupMembersOf?.users?.length || 0 }})</label>
@@ -598,15 +742,20 @@
         </div>
 
         <div class="data-table" v-if="groups.length > 0">
-          <div class="table-header" style="grid-template-columns:1fr 2fr 1fr 1.5fr">
+          <div class="table-header" style="grid-template-columns:1fr 2fr 0.5fr 1fr 1.5fr">
             <span>组名称</span>
             <span>描述</span>
+            <span>默认</span>
             <span>成员数</span>
             <span>操作</span>
           </div>
-          <div v-for="g in groups" :key="g.id" class="table-row" style="grid-template-columns:1fr 2fr 1fr 1.5fr">
+          <div v-for="g in groups" :key="g.id" class="table-row" style="grid-template-columns:1fr 2fr 0.5fr 1fr 1.5fr">
             <span style="font-weight:600;color:#E5E7EB">{{ g.name }}</span>
             <span style="color:#9CA3AF">{{ g.description || '-' }}</span>
+            <span style="text-align:center">
+              <span v-if="g.is_default" class="default-badge">是</span>
+              <span v-else style="color:#4B5058;font-size:12px">-</span>
+            </span>
             <span style="color:#9CA3AF">{{ g.user_count || 0 }}</span>
             <span class="th-actions">
               <button class="btn-table btn-edit" @click="openGroupMembers(g)">成员</button>
@@ -622,7 +771,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { apiGet, apiPost, apiPut, apiDelete, API_BASE, getAccessToken } from '@/utils/api'
@@ -690,10 +839,15 @@ const groups = ref<any[]>([])
 const allGroups = ref<any[]>([])
 const showGroupForm = ref(false)
 const editingGroup = ref<any>(null)
-const groupForm = reactive({ name: '', description: '' })
+const groupForm = reactive({ name: '', description: '', is_default: false })
 const showGroupMembers = ref(false)
 const groupMembersOf = ref<any>(null)
 const userToAdd = ref('')
+const memberSearchQuery = ref('')
+const memberSearchResults = ref<any[]>([])
+const searchingMembers = ref(false)
+const selectedMemberIds = ref<Set<string>>(new Set())
+let memberSearchTimer: any = null
 
 const availableUsersToAdd = computed(() => {
   if (!groupMembersOf.value || !users.value) return []
@@ -979,6 +1133,139 @@ async function deleteUser(u: any) {
   } catch { alert('删除失败') }
 }
 
+// ─── 用户详情 ───
+
+const showUserDetail = ref(false)
+const userDetailTarget = ref<any>(null)
+const detailTab = ref<'actions' | 'consents' | 'logs'>('actions')
+const userConsents = ref<any[]>([])
+const userLogs = ref<any[]>([])
+const loadingConsents = ref(false)
+const loadingLogs = ref(false)
+const logFilterAction = ref('')
+const logCurrentPage = ref(1)
+const totalLogs = ref(0)
+const logPageSize = 20
+
+async function openUserDetail(u: any) {
+  userDetailTarget.value = u
+  showUserDetail.value = true
+  detailTab.value = 'actions'
+  // 重新加载用户详情以获取 groups
+  try {
+    const data = await apiGet(`/api/users/${u.id}`)
+    userDetailTarget.value = { ...u, ...data }
+  } catch {}
+}
+
+function closeUserDetail() {
+  showUserDetail.value = false
+  userDetailTarget.value = null
+  userConsents.value = []
+  userLogs.value = []
+  totalLogs.value = 0
+  logCurrentPage.value = 1
+  logFilterAction.value = ''
+}
+
+async function clearUser2FA() {
+  if (!userDetailTarget.value) return
+  if (!confirm(`确定要清除用户 "${userDetailTarget.value.username}" 的 2FA 认证吗？`)) return
+  try {
+    const res = await fetch(`${API_BASE}/api/users/${userDetailTarget.value.id}/clear-2fa`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
+      credentials: 'include'
+    })
+    const data = await res.json()
+    if (res.ok) {
+      showToast(data.message || '已清除 2FA 认证', 'success')
+    } else {
+      alert(data.message || '清除失败')
+    }
+  } catch { alert('清除失败') }
+}
+
+async function loadUserConsents() {
+  if (!userDetailTarget.value) return
+  loadingConsents.value = true
+  try {
+    const data = await apiGet(`/api/users/${userDetailTarget.value.id}/consents`)
+    userConsents.value = data.consents || []
+  } catch {
+    userConsents.value = []
+  } finally {
+    loadingConsents.value = false
+  }
+}
+
+async function revokeConsent(c: any) {
+  if (!userDetailTarget.value) return
+  if (!confirm(`确定要撤销用户对 "${c.client_name}" 的授权吗？`)) return
+  try {
+    const data = await apiDelete(`/api/users/${userDetailTarget.value.id}/consents/${c.id}`)
+    if (data && data.message) {
+      showToast(data.message, 'success')
+      await loadUserConsents()
+    } else {
+      alert((data && data.message) || '撤销失败')
+    }
+  } catch (e: any) {
+    alert((e && e.message) || '撤销失败')
+  }
+}
+
+async function loadActivityLogs(page: number) {
+  if (!userDetailTarget.value) return
+  loadingLogs.value = true
+  logCurrentPage.value = page
+  try {
+    const offset = (page - 1) * logPageSize
+    let url = `/api/users/${userDetailTarget.value.id}/activity-logs?limit=${logPageSize}&offset=${offset}`
+    if (logFilterAction.value) url += `&action=${logFilterAction.value}`
+    const data = await apiGet(url)
+    userLogs.value = data.logs || []
+    totalLogs.value = data.total || 0
+  } catch {
+    userLogs.value = []
+    totalLogs.value = 0
+  } finally {
+    loadingLogs.value = false
+  }
+}
+
+function formatLogAction(action: string): string {
+  const map: Record<string, string> = {
+    login: '登录',
+    logout: '登出',
+    register: '注册',
+    change_password: '修改密码',
+    revoke_consent: '撤销授权',
+    register_passkey: '注册通行密钥',
+    delete_passkey: '删除通行密钥',
+    bind_social: '绑定社交',
+    unbind_social: '解绑社交',
+    update_profile: '更新资料',
+    upload_avatar: '上传头像',
+    delete_avatar: '删除头像',
+    change_email: '更换邮箱',
+    enable_2fa: '启用 2FA',
+    disable_2fa: '禁用 2FA',
+    admin_clear_2fa: '管理员清除 2FA',
+    reset_secret: '重置密钥'
+  }
+  return map[action] || action
+}
+
+// 切换 Tab 时按需加载数据
+watch(detailTab, (val) => {
+  if (val === 'consents' && userConsents.value.length === 0) {
+    loadUserConsents()
+  } else if (val === 'logs' && userLogs.value.length === 0) {
+    loadActivityLogs(1)
+  }
+})
+
 // ─── 用户组管理 ───
 
 async function loadAllGroups() {
@@ -1000,6 +1287,7 @@ function openGroupCreate() {
   editingGroup.value = null
   groupForm.name = ''
   groupForm.description = ''
+  groupForm.is_default = false
   showGroupForm.value = true
 }
 
@@ -1007,6 +1295,7 @@ function editGroup(g: any) {
   editingGroup.value = g
   groupForm.name = g.name
   groupForm.description = g.description || ''
+  groupForm.is_default = !!g.is_default
   showGroupForm.value = true
 }
 
@@ -1015,12 +1304,13 @@ function cancelGroupForm() {
   editingGroup.value = null
   groupForm.name = ''
   groupForm.description = ''
+  groupForm.is_default = false
 }
 
 async function createGroup() {
   if (!groupForm.name.trim()) { alert('组名称不能为空'); return }
   try {
-    const data = await apiPost('/api/groups', { name: groupForm.name.trim(), description: groupForm.description })
+    const data = await apiPost('/api/groups', { name: groupForm.name.trim(), description: groupForm.description, is_default: groupForm.is_default })
     if (data && data.id) {
       groups.value.unshift(data)
       allGroups.value.unshift(data)
@@ -1036,7 +1326,8 @@ async function updateGroup() {
   try {
     const data = await apiPut(`/api/groups/${editingGroup.value.id}`, {
       name: groupForm.name.trim(),
-      description: groupForm.description
+      description: groupForm.description,
+      is_default: groupForm.is_default
     })
     if (data && data.id) {
       const idx = groups.value.findIndex(g => g.id === data.id)
@@ -1064,6 +1355,9 @@ async function openGroupMembers(g: any) {
     const data = await apiGet(`/api/groups/${g.id}`)
     groupMembersOf.value = data
     userToAdd.value = ''
+    memberSearchQuery.value = ''
+    memberSearchResults.value = []
+    selectedMemberIds.value = new Set()
     showGroupMembers.value = true
   } catch { alert('加载成员失败') }
 }
@@ -1072,6 +1366,61 @@ function closeGroupMembers() {
   showGroupMembers.value = false
   groupMembersOf.value = null
   userToAdd.value = ''
+  memberSearchQuery.value = ''
+  memberSearchResults.value = []
+  selectedMemberIds.value = new Set()
+}
+
+function debouncedSearchMembers() {
+  clearTimeout(memberSearchTimer)
+  if (!memberSearchQuery.value.trim()) {
+    memberSearchResults.value = []
+    return
+  }
+  memberSearchTimer = setTimeout(() => searchMembers(), 300)
+}
+
+async function searchMembers() {
+  const q = memberSearchQuery.value.trim()
+  if (!q || !groupMembersOf.value) return
+  searchingMembers.value = true
+  try {
+    const data = await apiGet(`/api/users?search=${encodeURIComponent(q)}&limit=20`)
+    const allResults = data.users || []
+    const memberIds = new Set((groupMembersOf.value.users || []).map((u: any) => u.id))
+    memberSearchResults.value = allResults.filter((u: any) => !memberIds.has(u.id))
+    // 清除之前选中但不在搜索结果中的 ID
+    const validIds = new Set([...selectedMemberIds.value].filter(id => memberSearchResults.value.some((r: any) => r.id === id)))
+    selectedMemberIds.value = validIds
+  } catch {
+    memberSearchResults.value = []
+  } finally {
+    searchingMembers.value = false
+  }
+}
+
+function toggleMemberSelection(u: any) {
+  const newSet = new Set(selectedMemberIds.value)
+  if (newSet.has(u.id)) {
+    newSet.delete(u.id)
+  } else {
+    newSet.add(u.id)
+  }
+  selectedMemberIds.value = newSet
+}
+
+async function batchAddUsers() {
+  if (selectedMemberIds.value.size === 0 || !groupMembersOf.value) return
+  try {
+    await apiPost(`/api/groups/${groupMembersOf.value.id}/users`, {
+      user_ids: [...selectedMemberIds.value]
+    })
+    await openGroupMembers(groupMembersOf.value)
+    loadGroups()
+    showToast(`已添加 ${selectedMemberIds.value.size} 名用户`, 'success')
+  } catch (e: any) {
+    alert((e && e.message) || '添加失败')
+  }
 }
 
 async function addUserToGroup() {
@@ -1356,6 +1705,77 @@ textarea.form-input { resize: vertical; }
 .btn-warn:hover { background: rgba(245, 158, 11, 0.15); }
 .btn-success { background: rgba(16, 185, 129, 0.08); color: #6EE7B7; }
 .btn-success:hover { background: rgba(16, 185, 129, 0.15); }
+.btn-info { background: rgba(139, 92, 246, 0.08); color: #C4B5FD; }
+.btn-info:hover { background: rgba(139, 92, 246, 0.15); }
+
+/* 用户详情模态框 */
+.modal-detail { max-width: 720px !important; max-height: 85vh; display: flex; flex-direction: column; }
+.modal-detail .modal-body { overflow-y: auto; flex: 1; min-height: 0; }
+.modal-detail .modal-footer { flex-shrink: 0; }
+
+.detail-tabs { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 4px; margin-bottom: 16px; }
+.detail-tab { flex: 1; padding: 8px 12px; border: none; border-radius: 6px; background: transparent; color: #6B7280; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.3s ease; }
+.detail-tab.active { background: rgba(230, 57, 70, 0.12); color: #E63946; }
+.detail-tab:hover:not(.active) { color: #9CA3AF; }
+
+.detail-content { display: flex; flex-direction: column; gap: 16px; }
+.detail-section { background: rgba(0, 0, 0, 0.1); border-radius: 10px; padding: 14px 16px; }
+.section-label { font-size: 11px; font-weight: 600; color: #7C8290; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px; }
+
+.detail-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.info-item { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.info-key { color: #6B7280; font-size: 11px; }
+.info-val { color: #E5E7EB; word-break: break-all; }
+.ip-loc { color: #6B7280; font-size: 11px; }
+.group-empty { color: #6B7280; font-style: italic; }
+.group-tag { display: inline-block; padding: 2px 8px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.15); color: #93C5FD; border-radius: 50px; font-size: 11px; margin-right: 4px; margin-bottom: 2px; }
+
+.action-list { display: flex; flex-direction: column; gap: 8px; }
+.action-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; }
+.action-desc strong { font-size: 13px; color: #E5E7EB; display: block; }
+.action-desc p { font-size: 12px; color: #6B7280; margin: 4px 0 0; line-height: 1.5; }
+
+.consent-list { display: flex; flex-direction: column; gap: 8px; }
+.consent-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; }
+.consent-logo { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; flex-shrink: 0; }
+.consent-logo-placeholder { background: rgba(230, 57, 70, 0.12); color: #E63946; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+.consent-info { flex: 1; min-width: 0; }
+.consent-name { font-size: 13px; font-weight: 500; color: #E5E7EB; margin-bottom: 3px; }
+.consent-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #6B7280; }
+.consent-scopes { font-family: monospace; color: #9CA3AF; }
+
+.log-filter { display: flex; gap: 8px; margin-bottom: 12px; }
+.form-input-sm { padding: 6px 10px; font-size: 12px; }
+
+.log-list { display: flex; flex-direction: column; gap: 8px; }
+.log-item { padding: 10px 12px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border-left: 3px solid #4B5058; }
+.log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.log-action { padding: 2px 8px; border-radius: 50px; font-size: 11px; font-weight: 500; background: rgba(255,255,255,0.04); color: #9CA3AF; }
+.log-login { background: rgba(16, 185, 129, 0.1); color: #6EE7B7; }
+.log-logout { background: rgba(107, 114, 128, 0.1); color: #9CA3AF; }
+.log-register { background: rgba(59, 130, 246, 0.1); color: #93C5FD; }
+.log-change_password, .log-reset_secret { background: rgba(245, 158, 11, 0.1); color: #FCD34D; }
+.log-admin_clear_2fa, .log-revoke_consent { background: rgba(239, 68, 68, 0.1); color: #FCA5A5; }
+.log-enable_2fa, .log-register_passkey { background: rgba(139, 92, 246, 0.1); color: #C4B5FD; }
+.log-time { font-size: 11px; color: #6B7280; font-family: monospace; }
+.log-body { font-size: 12px; color: #9CA3AF; }
+.log-ip { color: #6B7280; font-size: 11px; margin-bottom: 4px; }
+.log-detail { background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px; margin-top: 4px; }
+.log-detail pre { margin: 0; font-size: 11px; color: #9CA3AF; white-space: pre-wrap; word-break: break-all; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+
+.detail-loading, .detail-empty { text-align: center; padding: 40px 20px; color: #6B7280; font-size: 13px; }
+
+/* 成员搜索 */
+.member-search-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.member-search-results { max-height: 240px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.member-search-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: background 0.2s ease; }
+.member-search-item:hover { background: rgba(255,255,255,0.04); }
+.member-checkbox { accent-color: #E63946; cursor: pointer; }
+.member-name { font-size: 13px; color: #E5E7EB; font-weight: 500; }
+.member-email { font-size: 11px; color: #6B7280; margin-left: auto; }
+
+/* 默认组标签 */
+.default-badge { display: inline-block; padding: 2px 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #6EE7B7; border-radius: 50px; font-size: 11px; font-weight: 500; }
 
 .pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; }
 .page-btn { padding: 8px 16px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; color: #9CA3AF; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.3s ease; }
