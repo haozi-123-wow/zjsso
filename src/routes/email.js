@@ -18,39 +18,26 @@ router.post('/send-activation', emailRateLimiter, async (req, res) => {
       });
     }
 
+    // 不区分用户是否存在，统一返回泛化响应以防止用户枚举
     const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(404).json({
-        error: 'user_not_found',
-        message: '该邮箱未注册',
-        statusCode: 404
-      });
+    if (user && !user.email_verified) {
+      const activationCode = emailService.generateCode();
+      await emailService.storeCode(email, activationCode, 'activation');
+      const sendResult = await emailService.sendActivationEmail(email, activationCode);
+
+      if (!sendResult.success) {
+        return res.status(500).json({
+          error: 'email_send_failed',
+          message: '邮件发送失败，请稍后再试',
+          statusCode: 500
+        });
+      }
     }
 
-    if (user.email_verified) {
-      return res.status(400).json({
-        error: 'already_activated',
-        message: '该账号已经激活，无需重复激活',
-        statusCode: 400
-      });
-    }
-
-    const activationCode = emailService.generateCode();
-    await emailService.storeCode(email, activationCode, 'activation');
-    const sendResult = await emailService.sendActivationEmail(email, activationCode);
-
-    if (sendResult.success) {
-      res.json({
-        message: '激活邮件已发送',
-        expires_in: 3600
-      });
-    } else {
-      res.status(500).json({
-        error: 'email_send_failed',
-        message: '邮件发送失败，请稍后再试',
-        statusCode: 500
-      });
-    }
+    res.json({
+      message: '如果该邮箱已注册，激活邮件已发送',
+      expires_in: 3600
+    });
   } catch (err) {
     console.error('Send activation email error:', err);
     res.status(500).json({
@@ -73,39 +60,26 @@ router.post('/send-reset-password', emailRateLimiter, async (req, res) => {
       });
     }
 
+    // 不区分用户是否存在，统一返回泛化响应以防止用户枚举
     const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(404).json({
-        error: 'user_not_found',
-        message: '该邮箱未注册',
-        statusCode: 404
-      });
+    if (user && user.password_hash) {
+      const resetCode = emailService.generateCode();
+      await emailService.storeCode(email, resetCode, 'reset_password');
+      const sendResult = await emailService.sendResetPasswordEmail(email, resetCode);
+
+      if (!sendResult.success) {
+        return res.status(500).json({
+          error: 'email_send_failed',
+          message: '邮件发送失败，请稍后再试',
+          statusCode: 500
+        });
+      }
     }
 
-    if (!user.password_hash) {
-      return res.status(400).json({
-        error: 'no_password',
-        message: '该账号为第三方登录账号，未设置密码',
-        statusCode: 400
-      });
-    }
-
-    const resetCode = emailService.generateCode();
-    await emailService.storeCode(email, resetCode, 'reset_password');
-    const sendResult = await emailService.sendResetPasswordEmail(email, resetCode);
-
-    if (sendResult.success) {
-      res.json({
-        message: '密码重置邮件已发送',
-        expires_in: 3600
-      });
-    } else {
-      res.status(500).json({
-        error: 'email_send_failed',
-        message: '邮件发送失败，请稍后再试',
-        statusCode: 500
-      });
-    }
+    res.json({
+      message: '如果该邮箱已注册，密码重置邮件已发送',
+      expires_in: 3600
+    });
   } catch (err) {
     console.error('Send reset password email error:', err);
     res.status(500).json({

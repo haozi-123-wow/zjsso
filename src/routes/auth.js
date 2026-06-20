@@ -31,6 +31,12 @@ const loginLimiter = createRateLimiter({
   keyPrefix: 'login'
 });
 
+const checkAvailableLimiter = createRateLimiter({
+  windowSeconds: 60,
+  maxRequests: 30,
+  keyPrefix: 'check_avail'
+});
+
 router.get('/client-info', async (req, res) => {
   try {
     const { client_id } = req.query;
@@ -160,7 +166,7 @@ router.get('/user/activities', authenticate, async (req, res) => {
   }
 });
 
-router.get('/check-available', async (req, res) => {
+router.get('/check-available', checkAvailableLimiter, async (req, res) => {
   const { username, email } = req.query;
   const result = {};
 
