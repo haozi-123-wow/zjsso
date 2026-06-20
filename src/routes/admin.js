@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const db = require('../database/connection');
 const config = require('../config');
 const User = require('../models/User');
+const Group = require('../models/Group');
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/role');
 const { createRateLimiter } = require('../middleware/rateLimiter');
@@ -27,6 +28,10 @@ const clientLimiter = createRateLimiter({
 });
 
 function formatClient(client) {
+  const allowedGroups = client.allowed_groups
+    ? (typeof client.allowed_groups === 'string' ? JSON.parse(client.allowed_groups) : client.allowed_groups)
+    : null;
+
   return {
     id: client.id,
     client_id: client.client_id,
@@ -41,6 +46,7 @@ function formatClient(client) {
     grant_types: typeof client.grant_types === 'string' ? JSON.parse(client.grant_types) : client.grant_types,
     response_types: typeof client.response_types === 'string' ? JSON.parse(client.response_types) : client.response_types,
     token_endpoint_auth_method: client.token_endpoint_auth_method,
+    allowed_groups: allowedGroups,
     pkce_required: !!client.pkce_required,
     enabled: !!client.enabled,
     created_by: client.created_by,
@@ -79,7 +85,8 @@ router.post('/clients/register', authenticate, clientLimiter, async (req, res) =
     const {
       client_name, client_description, redirect_uris,
       post_logout_redirect_uris, grant_types, response_types,
-      token_endpoint_auth_method, homepage_uri, logo_uri, pkce_required
+      token_endpoint_auth_method, homepage_uri, logo_uri, pkce_required,
+      allowed_groups
     } = req.body;
 
     if (!client_name) {
@@ -98,6 +105,10 @@ router.post('/clients/register', authenticate, clientLimiter, async (req, res) =
       }
     }
 
+    if (allowed_groups !== undefined && allowed_groups !== null && !Array.isArray(allowed_groups)) {
+      return res.status(400).json({ error: 'invalid_request', message: 'allowed_groups 必须是数组或 null' });
+    }
+
     const id = uuidv4();
     const clientId = generateClientId();
     const clientSecret = generateClientSecret();
@@ -107,8 +118,8 @@ router.post('/clients/register', authenticate, clientLimiter, async (req, res) =
       `INSERT INTO clients (id, client_id, client_secret, client_name, client_description,
         logo_uri, homepage_uri, redirect_uris, post_logout_redirect_uris,
         grant_types, response_types, token_endpoint_auth_method, pkce_required,
-        enabled, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        allowed_groups, enabled, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, clientId, hashedSecret, client_name, client_description || null,
         logo_uri || null, homepage_uri || null,
@@ -117,7 +128,9 @@ router.post('/clients/register', authenticate, clientLimiter, async (req, res) =
         JSON.stringify(grant_types || ['authorization_code', 'refresh_token']),
         JSON.stringify(response_types || ['code']),
         token_endpoint_auth_method || 'client_secret_basic',
-        !!pkce_required, true, req.user.id
+        !!pkce_required,
+        allowed_groups === undefined || allowed_groups === null ? null : JSON.stringify(allowed_groups),
+        true, req.user.id
       ]
     );
 
@@ -170,7 +183,8 @@ router.put('/clients/:id', authenticate, async (req, res) => {
     const allowedFields = [
       'client_name', 'client_description', 'redirect_uris',
       'post_logout_redirect_uris', 'grant_types', 'response_types',
-      'token_endpoint_auth_method', 'homepage_uri', 'logo_uri', 'pkce_required'
+      'token_endpoint_auth_method', 'homepage_uri', 'logo_uri', 'pkce_required',
+      'allowed_groups'
     ];
 
     const updates = [];
@@ -178,7 +192,13 @@ router.put('/clients/:id', authenticate, async (req, res) => {
 
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
-        if (Array.isArray(req.body[field])) {
+        if (field === 'allowed_groups') {
+          if (req.body[field] !== null && !Array.isArray(req.body[field])) {
+            return res.status(400).json({ error: 'invalid_request', message: 'allowed_groups 必须是数组或 null' });
+          }
+          updates.push(`${field} = ?`);
+          values.push(req.body[field] === null ? null : JSON.stringify(req.body[field]));
+        } else if (Array.isArray(req.body[field])) {
           for (const uri of req.body[field]) {
             if (uri.includes('://')) {
               try { new URL(uri); } catch {
@@ -362,6 +382,8 @@ router.get('/users/:id', authenticate, requireRole('admin'), async (req, res) =>
       return res.status(404).json({ error: 'not_found', message: '用户不存在' });
     }
 
+    const groups = await Group.getUserGroups(req.params.id);
+
     res.json({
       id: user.id,
       username: user.username,
@@ -380,6 +402,7 @@ router.get('/users/:id', authenticate, requireRole('admin'), async (req, res) =>
       last_login_ip: user.last_login_ip,
       last_login_ip_location: user.last_login_ip_location,
       last_login_at: user.last_login_at,
+      groups,
       created_at: user.created_at,
       updated_at: user.updated_at
     });
@@ -444,6 +467,7 @@ router.delete('/users/:id', authenticate, requireRole('admin'), async (req, res)
 
     await db.query('DELETE FROM user_consents WHERE user_id = ?', [req.params.id]);
     await db.query('DELETE FROM refresh_tokens WHERE user_id = ?', [req.params.id]);
+    await db.query('DELETE FROM user_groups WHERE user_id = ?', [req.params.id]);
     await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
 
     res.status(204).end();

@@ -20,6 +20,7 @@ function generateAccessToken(user, client, scope) {
     preferred_username: user.username,
     email: user.email,
     role: user.role || 'user',
+    groups: user.groups || [],
     scope: scope || 'openid'
   };
 
@@ -96,6 +97,7 @@ async function issueTokens(client, user, scope, nonce) {
         username: user.username,
         email: user.email,
         role: user.role || 'user',
+        groups: user.groups || [],
         scopes: scope || 'openid',
         jti
       }),
@@ -190,6 +192,7 @@ async function validateAccessToken(token) {
       username: decoded.preferred_username,
       email: decoded.email,
       role: decoded.role || 'user',
+      groups: decoded.groups || [],
       scopes: decoded.scope,
       jti: decoded.jti,
       clientId: decoded.aud

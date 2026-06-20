@@ -7,6 +7,7 @@ const config = require('../config');
 const authService = require('../services/oidc/AuthorizationService');
 const tokenService = require('../services/oidc/TokenService');
 const userInfoService = require('../services/oidc/UserInfoService');
+const Group = require('../models/Group');
 const { createRateLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -112,6 +113,11 @@ router.get('/authorize', authorizeLimiter, async (req, res) => {
       return res.redirect(createErrorRedirect(redirect_uri, 'access_denied', '用户不存在或已禁用', state));
     }
 
+    const hasGroupAccess = await checkClientGroupAccess(client, fullUser[0].id);
+    if (!hasGroupAccess) {
+      return res.redirect(createErrorRedirect(redirect_uri, 'access_denied', '您所在的用户组无权访问此应用', state));
+    }
+
     await db.query(
       `INSERT INTO user_consents (id, user_id, client_id, scopes, granted_at)
        VALUES (?, ?, ?, ?, NOW())
@@ -201,6 +207,12 @@ async function handleAuthorizationCodeGrant(req, res) {
   }
 
   const user = users[0];
+
+  const hasGroupAccess = await checkClientGroupAccess(client, user.id);
+  if (!hasGroupAccess) {
+    return res.status(403).json({ error: 'access_denied', error_description: '您所在的用户组无权访问此应用' });
+  }
+
   const tokens = await tokenService.issueTokens(client, user, authCodeData.scope, authCodeData.nonce);
 
   res.json({
@@ -266,6 +278,28 @@ async function handleClientCredentialsGrant(req, res) {
     expires_in: tokens.expiresIn,
     scope: tokens.scope
   });
+}
+
+async function checkClientGroupAccess(client, userId) {
+  if (client.allowed_groups === null || client.allowed_groups === undefined) {
+    return true;
+  }
+
+  let allowedGroupIds;
+  try {
+    allowedGroupIds = typeof client.allowed_groups === 'string'
+      ? JSON.parse(client.allowed_groups)
+      : client.allowed_groups;
+  } catch {
+    return false;
+  }
+
+  if (!Array.isArray(allowedGroupIds) || allowedGroupIds.length === 0) {
+    return false;
+  }
+
+  const userGroupIds = await Group.getUserGroupIds(userId);
+  return allowedGroupIds.some(groupId => userGroupIds.includes(groupId));
 }
 
 function createErrorRedirect(redirectUri, error, description, state) {

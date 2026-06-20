@@ -51,6 +51,7 @@
         <button :class="['admin-tab', { active: tab === 'overview' }]" @click="tab = 'overview'">概览</button>
         <button :class="['admin-tab', { active: tab === 'clients' }]" @click="tab = 'clients'">客户端管理</button>
         <button v-if="auth.user?.role === 'admin'" :class="['admin-tab', { active: tab === 'users' }]" @click="tab = 'users'">用户管理</button>
+        <button v-if="auth.user?.role === 'admin'" :class="['admin-tab', { active: tab === 'groups' }]" @click="tab = 'groups'">用户组</button>
       </div>
 
       <div v-if="tab === 'overview'" class="admin-section">
@@ -196,6 +197,16 @@
                     <input type="checkbox" v-model="clientForm.pkce_required" /> 强制 PKCE
                   </label>
                 </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">允许访问的用户组</label>
+                <div class="checkbox-group" style="max-height:160px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px">
+                  <p v-if="allGroups.length === 0" style="color:#4B5058;font-size:12px;margin:0">暂无用户组（不勾选 = 允许所有用户访问）</p>
+                  <label v-for="g in allGroups" :key="g.id" class="checkbox-label">
+                    <input type="checkbox" :value="g.id" v-model="clientForm.allowed_groups" /> {{ g.name }}
+                  </label>
+                </div>
+                <span style="font-size:11px;color:#6B7280;margin-top:4px">不勾选任何组 = 不限制；勾选后仅这些组中的用户可登录</span>
               </div>
             </div>
             <div class="modal-footer">
@@ -516,6 +527,96 @@
           <button class="page-btn" :disabled="currentPage >= Math.ceil(totalUsers / pageSize)" @click="currentPage++; loadUsers()">下一页</button>
         </div>
       </div>
+
+      <div v-if="tab === 'groups'" class="admin-section">
+        <div class="section-header">
+          <h3 class="section-title">用户组 <span class="title-count">({{ groups.length }})</span></h3>
+          <div class="header-actions">
+            <button class="btn-add" @click="openGroupCreate">新建用户组</button>
+          </div>
+        </div>
+
+        <!-- 组编辑/创建模态框 -->
+        <div class="modal-overlay" v-if="showGroupForm" @click.self="cancelGroupForm">
+          <div class="modal">
+            <div class="modal-header">
+              <h4>{{ editingGroup ? '编辑用户组' : '创建用户组' }}</h4>
+              <button class="modal-close" @click="cancelGroupForm">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">组名称 *</label>
+                <input v-model="groupForm.name" class="form-input" placeholder="如：内网用户、外包人员" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">组描述</label>
+                <textarea v-model="groupForm.description" class="form-input" rows="3" placeholder="选填，描述组用途"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-cancel" @click="cancelGroupForm">取消</button>
+              <button class="btn-submit" style="flex:1" @click="editingGroup ? updateGroup() : createGroup()">
+                {{ editingGroup ? '保存修改' : '创建' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 组成员管理模态框 -->
+        <div class="modal-overlay" v-if="showGroupMembers" @click.self="closeGroupMembers">
+          <div class="modal modal-help">
+            <div class="modal-header">
+              <h4>成员管理 - {{ groupMembersOf?.name }}</h4>
+              <button class="modal-close" @click="closeGroupMembers">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-group">
+                <label class="form-label">添加用户</label>
+                <select v-model="userToAdd" class="form-input">
+                  <option value="">选择用户...</option>
+                  <option v-for="u in availableUsersToAdd" :key="u.id" :value="u.id">
+                    {{ u.username }} ({{ u.email }})
+                  </option>
+                </select>
+                <button class="btn-submit" style="margin-top:8px" :disabled="!userToAdd" @click="addUserToGroup">添加到组</button>
+              </div>
+              <div class="form-group">
+                <label class="form-label">当前成员 ({{ groupMembersOf?.users?.length || 0 }})</label>
+                <div v-if="groupMembersOf && groupMembersOf.users && groupMembersOf.users.length > 0" style="display:flex;flex-direction:column;gap:6px">
+                  <div v-for="m in groupMembersOf.users" :key="m.id" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(0,0,0,0.2);border-radius:6px">
+                    <span style="font-size:13px;color:#E5E7EB">{{ m.username }} <span style="color:#6B7280;font-size:11px">({{ m.email }})</span></span>
+                    <button class="btn-table btn-danger" @click="removeUserFromGroup(m.id)">移除</button>
+                  </div>
+                </div>
+                <p v-else style="color:#6B7280;font-size:13px;margin:0">该组暂无成员</p>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-cancel" @click="closeGroupMembers">关闭</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="data-table" v-if="groups.length > 0">
+          <div class="table-header" style="grid-template-columns:1fr 2fr 1fr 1.5fr">
+            <span>组名称</span>
+            <span>描述</span>
+            <span>成员数</span>
+            <span>操作</span>
+          </div>
+          <div v-for="g in groups" :key="g.id" class="table-row" style="grid-template-columns:1fr 2fr 1fr 1.5fr">
+            <span style="font-weight:600;color:#E5E7EB">{{ g.name }}</span>
+            <span style="color:#9CA3AF">{{ g.description || '-' }}</span>
+            <span style="color:#9CA3AF">{{ g.user_count || 0 }}</span>
+            <span class="th-actions">
+              <button class="btn-table btn-edit" @click="openGroupMembers(g)">成员</button>
+              <button class="btn-table btn-edit" @click="editGroup(g)">编辑</button>
+              <button class="btn-table btn-danger" @click="deleteGroup(g)">删除</button>
+            </span>
+          </div>
+        </div>
+        <div v-else class="empty"><p>暂无用户组，点击"新建用户组"开始创建</p></div>
+      </div>
     </div>
   </div>
 </template>
@@ -524,7 +625,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost, API_BASE, getAccessToken } from '@/utils/api'
+import { apiGet, apiPost, apiPut, apiDelete, API_BASE, getAccessToken } from '@/utils/api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -553,7 +654,8 @@ const clientForm = reactive({
   grant_types: ['authorization_code', 'refresh_token'],
   response_types: ['code'],
   token_endpoint_auth_method: 'client_secret_basic',
-  pkce_required: false
+  pkce_required: false,
+  allowed_groups: [] as string[]
 })
 
 const filteredClients = computed(() => {
@@ -582,6 +684,22 @@ const pageSize = 20
 let searchTimer: any = null
 
 const displayedUsers = computed(() => users.value)
+
+// 用户组状态
+const groups = ref<any[]>([])
+const allGroups = ref<any[]>([])
+const showGroupForm = ref(false)
+const editingGroup = ref<any>(null)
+const groupForm = reactive({ name: '', description: '' })
+const showGroupMembers = ref(false)
+const groupMembersOf = ref<any>(null)
+const userToAdd = ref('')
+
+const availableUsersToAdd = computed(() => {
+  if (!groupMembersOf.value || !users.value) return []
+  const memberIds = new Set((groupMembersOf.value.users || []).map((u: any) => u.id))
+  return users.value.filter(u => !memberIds.has(u.id))
+})
 
 function debouncedSearchUsers() {
   clearTimeout(searchTimer)
@@ -637,6 +755,7 @@ function cancelClientForm() {
   clientForm.response_types = ['code']
   clientForm.token_endpoint_auth_method = 'client_secret_basic'
   clientForm.pkce_required = false
+  clientForm.allowed_groups = []
 }
 
 function editClient(c: any) {
@@ -649,6 +768,7 @@ function editClient(c: any) {
   clientForm.response_types = [...(c.response_types || ['code'])]
   clientForm.token_endpoint_auth_method = c.token_endpoint_auth_method
   clientForm.pkce_required = c.pkce_required
+  clientForm.allowed_groups = Array.isArray(c.allowed_groups) ? [...c.allowed_groups] : []
   logoPreview.value = c.logo_uri || null
   showClientForm.value = true
 }
@@ -666,7 +786,8 @@ async function createClient() {
       grant_types: clientForm.grant_types,
       response_types: clientForm.response_types,
       token_endpoint_auth_method: clientForm.token_endpoint_auth_method,
-      pkce_required: clientForm.pkce_required
+      pkce_required: clientForm.pkce_required,
+      allowed_groups: clientForm.allowed_groups.length > 0 ? clientForm.allowed_groups : null
     })
     if (data.client_id) {
       clients.value.unshift(data)
@@ -684,31 +805,23 @@ async function createClient() {
 async function updateClient() {
   if (!editingClient.value) return
   try {
-    const res = await fetch(`${API_BASE}/api/clients/${editingClient.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getAccessToken()}`
-      },
-      body: JSON.stringify({
-        client_name: clientForm.client_name,
-        client_description: clientForm.client_description,
-        redirect_uris: clientForm.redirect_uris.filter(Boolean),
-        post_logout_redirect_uris: clientForm.post_logout_redirect_uris.filter(Boolean),
-        grant_types: clientForm.grant_types,
-        response_types: clientForm.response_types,
-        token_endpoint_auth_method: clientForm.token_endpoint_auth_method,
-        pkce_required: clientForm.pkce_required
-      }),
-      credentials: 'include'
+    const data = await apiPut(`/api/clients/${editingClient.value.id}`, {
+      client_name: clientForm.client_name,
+      client_description: clientForm.client_description,
+      redirect_uris: clientForm.redirect_uris.filter(Boolean),
+      post_logout_redirect_uris: clientForm.post_logout_redirect_uris.filter(Boolean),
+      grant_types: clientForm.grant_types,
+      response_types: clientForm.response_types,
+      token_endpoint_auth_method: clientForm.token_endpoint_auth_method,
+      pkce_required: clientForm.pkce_required,
+      allowed_groups: clientForm.allowed_groups.length > 0 ? clientForm.allowed_groups : null
     })
-    const data = await res.json()
-    if (res.ok) {
+    if (data && data.id) {
       const idx = clients.value.findIndex(c => c.id === editingClient.value.id)
       if (idx >= 0) clients.value[idx] = data
       cancelClientForm()
     } else {
-      alert(data.message || '更新失败')
+      alert((data && data.message) || '更新失败')
     }
   } catch { alert('更新失败') }
 }
@@ -716,19 +829,12 @@ async function updateClient() {
 async function deleteClient(id: string) {
   if (!confirm('确定删除此客户端吗？此操作不可撤销。')) return
   try {
-    const res = await fetch(`${API_BASE}/api/clients/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${getAccessToken()}` },
-      credentials: 'include'
-    })
-    if (res.ok || res.status === 204) {
-      clients.value = clients.value.filter(c => c.id !== id)
-      stats.clientCount--
-    } else {
-      const data = await res.json()
-      alert(data.message || '删除失败')
-    }
-  } catch { alert('删除失败') }
+    await apiDelete(`/api/clients/${id}`)
+    clients.value = clients.value.filter(c => c.id !== id)
+    stats.clientCount--
+  } catch (e: any) {
+    alert((e && e.message) || '删除失败')
+  }
 }
 
 async function resetClientSecret(c: any) {
@@ -873,6 +979,124 @@ async function deleteUser(u: any) {
   } catch { alert('删除失败') }
 }
 
+// ─── 用户组管理 ───
+
+async function loadAllGroups() {
+  try {
+    const data = await apiGet('/api/groups')
+    allGroups.value = data.groups || []
+  } catch { allGroups.value = [] }
+}
+
+async function loadGroups() {
+  if (auth.user?.role !== 'admin') return
+  try {
+    const data = await apiGet('/api/groups')
+    groups.value = data.groups || []
+  } catch { groups.value = [] }
+}
+
+function openGroupCreate() {
+  editingGroup.value = null
+  groupForm.name = ''
+  groupForm.description = ''
+  showGroupForm.value = true
+}
+
+function editGroup(g: any) {
+  editingGroup.value = g
+  groupForm.name = g.name
+  groupForm.description = g.description || ''
+  showGroupForm.value = true
+}
+
+function cancelGroupForm() {
+  showGroupForm.value = false
+  editingGroup.value = null
+  groupForm.name = ''
+  groupForm.description = ''
+}
+
+async function createGroup() {
+  if (!groupForm.name.trim()) { alert('组名称不能为空'); return }
+  try {
+    const data = await apiPost('/api/groups', { name: groupForm.name.trim(), description: groupForm.description })
+    if (data && data.id) {
+      groups.value.unshift(data)
+      allGroups.value.unshift(data)
+      cancelGroupForm()
+    } else {
+      alert((data && data.message) || '创建失败')
+    }
+  } catch { alert('创建失败') }
+}
+
+async function updateGroup() {
+  if (!editingGroup.value) return
+  try {
+    const data = await apiPut(`/api/groups/${editingGroup.value.id}`, {
+      name: groupForm.name.trim(),
+      description: groupForm.description
+    })
+    if (data && data.id) {
+      const idx = groups.value.findIndex(g => g.id === data.id)
+      if (idx >= 0) groups.value[idx] = data
+      cancelGroupForm()
+    } else {
+      alert((data && data.message) || '更新失败')
+    }
+  } catch { alert('更新失败') }
+}
+
+async function deleteGroup(g: any) {
+  if (!confirm(`确定删除组 "${g.name}" 吗？该组的所有成员关联将被自动解除。`)) return
+  try {
+    await apiDelete(`/api/groups/${g.id}`)
+    groups.value = groups.value.filter(x => x.id !== g.id)
+    allGroups.value = allGroups.value.filter(x => x.id !== g.id)
+  } catch (e: any) {
+    alert((e && e.message) || '删除失败')
+  }
+}
+
+async function openGroupMembers(g: any) {
+  try {
+    const data = await apiGet(`/api/groups/${g.id}`)
+    groupMembersOf.value = data
+    userToAdd.value = ''
+    showGroupMembers.value = true
+  } catch { alert('加载成员失败') }
+}
+
+function closeGroupMembers() {
+  showGroupMembers.value = false
+  groupMembersOf.value = null
+  userToAdd.value = ''
+}
+
+async function addUserToGroup() {
+  if (!userToAdd.value || !groupMembersOf.value) return
+  try {
+    await apiPost(`/api/groups/${groupMembersOf.value.id}/users`, { user_ids: [userToAdd.value] })
+    await openGroupMembers(groupMembersOf.value)
+    loadGroups()
+  } catch (e: any) {
+    alert((e && e.message) || '添加失败')
+  }
+}
+
+async function removeUserFromGroup(userId: string) {
+  if (!groupMembersOf.value) return
+  if (!confirm('确定移除该用户吗？')) return
+  try {
+    await apiDelete(`/api/groups/${groupMembersOf.value.id}/users/${userId}`)
+    await openGroupMembers(groupMembersOf.value)
+    loadGroups()
+  } catch (e: any) {
+    alert((e && e.message) || '移除失败')
+  }
+}
+
 async function uploadLogo(e: Event) {
   const input = e.target as HTMLInputElement
   if (!input.files || !input.files[0]) return
@@ -954,7 +1178,11 @@ onMounted(() => {
   if (auth.isLoggedIn && isAdmin.value) {
     loadStats()
     loadClients()
-    if (auth.user?.role === 'admin') loadUsers()
+    loadAllGroups()
+    if (auth.user?.role === 'admin') {
+      loadUsers()
+      loadGroups()
+    }
   }
 })
 </script>

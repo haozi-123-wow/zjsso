@@ -86,4 +86,31 @@ export async function apiPost(path: string, body?: any) {
   return res.json()
 }
 
+export async function apiPut(path: string, body?: any) {
+  await ensureValidToken()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include',
+  })
+  if (res.status === 204) return null
+  return res.json()
+}
+
+export async function apiDelete(path: string) {
+  await ensureValidToken()
+  const headers: Record<string, string> = {}
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers,
+    credentials: 'include',
+  })
+  if (res.status === 204) return null
+  return res.json()
+}
+
 export { API_BASE }

@@ -8,7 +8,18 @@ async function getUserInfo(accessToken) {
   }
 
   const users = await db.query(
-    'SELECT id, username, email, display_name, picture, email_verified, phone, locale, qq, role FROM users WHERE id = ?',
+    `SELECT u.id, u.username, u.email, u.display_name, u.picture, u.email_verified, u.phone, u.locale, u.qq, u.role,
+            COALESCE(
+              JSON_ARRAYAGG(
+                JSON_OBJECT('id', g.id, 'name', g.name)
+              ),
+              JSON_ARRAY()
+            ) as groups
+     FROM users u
+     LEFT JOIN user_groups ug ON ug.user_id = u.id
+     LEFT JOIN \`groups\` g ON g.id = ug.group_id
+     WHERE u.id = ?
+     GROUP BY u.id`,
     [tokenData.id]
   );
 
@@ -30,6 +41,7 @@ async function getUserInfo(accessToken) {
     claims.locale = user.locale || 'zh-CN';
     claims.qq = user.qq;
     claims.role = user.role;
+    claims.groups = user.groups;
   }
 
   if (scopes.includes('email')) {

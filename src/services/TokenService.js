@@ -19,6 +19,7 @@ async function generateTokens(user) {
     preferred_username: user.username,
     email: user.email,
     role: user.role || 'user',
+    groups: user.groups || [],
     scope: 'openid profile email'
   };
 
@@ -56,6 +57,7 @@ async function generateTokens(user) {
         username: user.username,
         email: user.email,
         role: user.role || 'user',
+        groups: user.groups || [],
         scopes: 'openid profile email',
         jti
       }),
