@@ -16,6 +16,7 @@ const { log, ACTION } = require('../services/ActivityLogService');
 const { generateTempToken } = require('./totp');
 const { generateTokens } = require('../services/TokenService');
 const { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromCookie } = require('../utils/cookie');
+const { generateCsrfToken, setCsrfCookie, clearCsrfCookie, requireCsrfToken } = require('../middleware/csrf');
 
 const router = express.Router();
 
@@ -384,11 +385,15 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     setRefreshTokenCookie(res, tokens.refreshToken);
 
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(res, csrfToken);
+
     res.json({
       access_token: tokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
       id_token: tokens.idToken,
+      csrf_token: csrfToken,
       user: {
         id: user.id,
         username: user.username,
@@ -567,11 +572,15 @@ router.post('/login-with-code', loginLimiter, async (req, res) => {
 
     setRefreshTokenCookie(res, tokens.refreshToken);
 
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(res, csrfToken);
+
     res.json({
       access_token: tokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
       id_token: tokens.idToken,
+      csrf_token: csrfToken,
       user: {
         id: user.id,
         username: user.username,
@@ -632,7 +641,7 @@ router.post('/logout', authenticate, async (req, res) => {
   }
 });
 
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', requireCsrfToken, async (req, res) => {
   try {
     const refresh_token = getRefreshTokenFromCookie(req);
 
@@ -682,11 +691,15 @@ router.post('/refresh', async (req, res) => {
 
     setRefreshTokenCookie(res, newTokens.refreshToken);
 
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(res, csrfToken);
+
     res.json({
       access_token: newTokens.accessToken,
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
-      id_token: newTokens.idToken
+      id_token: newTokens.idToken,
+      csrf_token: csrfToken
     });
   } catch (err) {
     console.error('Refresh error:', err);
@@ -761,6 +774,9 @@ router.post('/session', async (req, res) => {
     const newTokens = await generateTokens(user);
     setRefreshTokenCookie(res, newTokens.refreshToken);
 
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(res, csrfToken);
+
     log(user.id, ACTION.LOGIN, { method: 'session_restore' }, req);
 
     res.json({
@@ -768,6 +784,7 @@ router.post('/session', async (req, res) => {
       token_type: 'Bearer',
       expires_in: config.jwt.expiresIn,
       id_token: newTokens.idToken,
+      csrf_token: csrfToken,
       user: {
         id: user.id,
         username: user.username,
