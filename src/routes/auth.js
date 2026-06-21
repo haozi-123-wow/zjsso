@@ -727,21 +727,27 @@ router.post('/session', async (req, res) => {
     }
 
     const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
-    const rows = await db.query(
-      `SELECT rt.*, u.username, u.email, u.display_name, u.picture, u.role
-       FROM refresh_tokens rt
-       INNER JOIN users u ON u.id = rt.user_id
-       WHERE rt.token_hash = ? AND rt.revoked = FALSE AND rt.used = FALSE AND rt.expires_at > NOW()`,
+
+    const result = await db.query(
+      `UPDATE refresh_tokens SET used = TRUE
+       WHERE token_hash = ? AND used = FALSE AND revoked = FALSE AND expires_at > NOW()`,
       [tokenHash]
     );
 
-    if (rows.length === 0) {
+    if (result.affectedRows === 0) {
       clearRefreshTokenCookie(res);
       return res.status(401).json({ error: 'unauthenticated', message: '会话已过期' });
     }
 
+    const rows = await db.query(
+      `SELECT rt.*, u.username, u.email, u.display_name, u.picture, u.role
+       FROM refresh_tokens rt
+       INNER JOIN users u ON u.id = rt.user_id
+       WHERE rt.token_hash = ?`,
+      [tokenHash]
+    );
+
     const tokenRecord = rows[0];
-    await db.query('UPDATE refresh_tokens SET used = TRUE WHERE id = ?', [tokenRecord.id]);
 
     const user = {
       id: tokenRecord.user_id,
