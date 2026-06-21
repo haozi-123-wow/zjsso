@@ -189,7 +189,7 @@ async function verifyRegistration(userId, credential) {
   const aaguid = attestedCredData.subarray(0, 16).toString('hex');
   const credIdLen = attestedCredData.readUInt16BE(16);
   const credIdB64 = attestedCredData.subarray(18, 18 + credIdLen).toString('base64url');
-  const credentialId = credential.id || credIdB64;
+  const credentialId = credIdB64;
   const coseKeyRaw = attestedCredData.subarray(18 + credIdLen);
 
   const parsedCoseKey = parseCOSEKey(coseKeyRaw);
