@@ -61,11 +61,7 @@ function formatLocation(data) {
 }
 
 function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-         req.headers['x-real-ip'] ||
-         req.ip ||
-         req.connection?.remoteAddress ||
-         null;
+  return req.ip || req.connection?.remoteAddress || null;
 }
 
 module.exports = { getIpLocation, getClientIp };

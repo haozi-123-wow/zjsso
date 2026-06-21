@@ -21,6 +21,9 @@ const verifyRoutes = require('./routes/verify');
 
 const app = express();
 
+// 信任反向代理（Nginx 等），使 req.ip 使用可信的 X-Forwarded-For 末位
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
