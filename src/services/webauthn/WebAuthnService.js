@@ -98,8 +98,11 @@ function readTextString(buf, offset) {
   return { value: buf.toString('utf-8', offset + skip, offset + skip + len), skip: skip + len };
 }
 
-function cborSkipValue(buf, offset) {
+const MAX_CBOR_DEPTH = 32;
+
+function cborSkipValue(buf, offset, depth) {
   if (offset >= buf.length) return offset;
+  if (depth > MAX_CBOR_DEPTH) throw new Error('CBOR 嵌套深度超出限制');
   const mt = buf[offset] >> 5;
   if (mt === 7) return offset + 1;
   const val = buf[offset] & 0x1f;
@@ -114,8 +117,8 @@ function cborSkipValue(buf, offset) {
   if (mt === 4 || mt === 5) {
     let pos = offset + skip;
     for (let i = 0; i < dataLen; i++) {
-      if (mt === 5) pos = cborSkipValue(buf, pos);
-      pos = cborSkipValue(buf, pos);
+      if (mt === 5) pos = cborSkipValue(buf, pos, depth + 1);
+      pos = cborSkipValue(buf, pos, depth + 1);
     }
     return pos;
   }
@@ -136,7 +139,7 @@ function extractAuthDataFromAttestation(attestationBuf) {
         if (byteResult) return byteResult.value;
         break;
       }
-      offset = cborSkipValue(attestationBuf, offset);
+      offset = cborSkipValue(attestationBuf, offset, 0);
     }
   }
   return attestationBuf;
