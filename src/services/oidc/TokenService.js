@@ -112,25 +112,29 @@ async function issueTokens(client, user, scope, nonce) {
 async function refreshTokens(refreshToken, client) {
   const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
+  const result = await db.query(
+    `UPDATE refresh_tokens SET used = TRUE
+     WHERE token_hash = ? AND used = FALSE AND revoked = FALSE AND expires_at > NOW()`,
+    [tokenHash]
+  );
+
+  if (result.affectedRows === 0) {
+    return null;
+  }
+
   const tokens = await db.query(
     `SELECT rt.*, u.id as user_id, u.username, u.email, u.display_name, u.picture, u.role
      FROM refresh_tokens rt
      INNER JOIN users u ON u.id = rt.user_id
-     WHERE rt.token_hash = ? AND rt.revoked = FALSE AND rt.used = FALSE AND rt.expires_at > NOW()`,
+     WHERE rt.token_hash = ?`,
     [tokenHash]
   );
-
-  if (tokens.length === 0) {
-    return null;
-  }
 
   const tokenRecord = tokens[0];
 
   if (client && tokenRecord.client_id !== client.id) {
     return null;
   }
-
-  await db.query('UPDATE refresh_tokens SET used = TRUE WHERE id = ?', [tokenRecord.id]);
 
   const user = {
     id: tokenRecord.user_id,
