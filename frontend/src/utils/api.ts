@@ -3,6 +3,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:6873'
 let accessToken: string | null = null
 let tokenExpiresAt: number | null = null
 let csrfToken: string | null = null
+let authPromise: Promise<boolean> | null = null
 
 // access_token 仅保存在内存中，页面刷新后通过 refresh_token cookie 恢复
 export function setTokens(access: string, _refresh: string, expiresIn: number) {
@@ -35,50 +36,65 @@ function storeCsrfFromResponse(data: any) {
 // 页面刷新后通过 refresh_token cookie 恢复会话
 export async function restoreSession(): Promise<boolean> {
   if (accessToken && !isTokenExpired()) return true
-  try {
-    const headers: Record<string, string> = {}
-    if (csrfToken) headers['X-CSRF-Token'] = csrfToken
-    const res = await fetch(`${API_BASE}/api/auth/session`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-    })
-    if (!res.ok) return false
-    const data = await res.json()
-    storeCsrfFromResponse(data)
-    if (data.access_token) {
-      setTokens(data.access_token, '', data.expires_in)
-      return true
+  if (authPromise) return authPromise
+  authPromise = (async () => {
+    try {
+      const headers: Record<string, string> = {}
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+      const res = await fetch(`${API_BASE}/api/auth/session`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      })
+      if (!res.ok) return false
+      const data = await res.json()
+      storeCsrfFromResponse(data)
+      if (data.access_token) {
+        setTokens(data.access_token, '', data.expires_in)
+        return true
+      }
+      return false
+    } catch {
+      return false
+    } finally {
+      authPromise = null
     }
-    return false
-  } catch {
-    return false
-  }
+  })()
+  return authPromise
 }
 
 export async function ensureValidToken() {
   if (accessToken && !isTokenExpired()) return true
+  if (authPromise) {
+    const ok = await authPromise
+    return ok && !!accessToken
+  }
   // 无内存令牌或已过期，尝试通过 cookie 刷新
-  try {
-    const headers: Record<string, string> = {}
-    if (csrfToken) headers['X-CSRF-Token'] = csrfToken
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-    })
-    if (!res.ok) {
+  authPromise = (async () => {
+    try {
+      const headers: Record<string, string> = {}
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        clearTokens()
+        return false
+      }
+      const data = await res.json()
+      storeCsrfFromResponse(data)
+      setTokens(data.access_token, '', data.expires_in)
+      return true
+    } catch {
       clearTokens()
       return false
+    } finally {
+      authPromise = null
     }
-    const data = await res.json()
-    storeCsrfFromResponse(data)
-    setTokens(data.access_token, '', data.expires_in)
-    return true
-  } catch {
-    clearTokens()
-    return false
-  }
+  })()
+  return authPromise
 }
 
 class ApiError extends Error {

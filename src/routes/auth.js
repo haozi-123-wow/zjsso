@@ -741,20 +741,13 @@ router.post('/session', async (req, res) => {
 
     const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
 
-    console.log('[DEBUG /session] refresh_token prefix:', refresh_token.substring(0, 16));
-    console.log('[DEBUG /session] token_hash:', tokenHash);
-
     const result = await db.query(
       `UPDATE refresh_tokens SET used = TRUE
        WHERE token_hash = ? AND used = FALSE AND revoked = FALSE AND expires_at > NOW()`,
       [tokenHash]
     );
 
-    console.log('[DEBUG /session] affectedRows:', result.affectedRows);
-
     if (result.affectedRows === 0) {
-      const check = await db.query('SELECT id, used, revoked, expires_at FROM refresh_tokens WHERE token_hash = ?', [tokenHash]);
-      console.log('[DEBUG /session] matching rows in DB:', check.length, check[0] || 'none');
       clearRefreshTokenCookie(res);
       return res.status(401).json({ error: 'unauthenticated', message: '会话已过期' });
     }
