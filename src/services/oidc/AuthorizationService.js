@@ -148,7 +148,14 @@ async function consumeAuthorizationCode(code, clientId, codeVerifier) {
     return null;
   }
 
-  await db.query('UPDATE authorization_codes SET used = TRUE WHERE code = ?', [code]);
+  const result = await db.query(
+    'UPDATE authorization_codes SET used = TRUE WHERE code = ? AND client_id = ? AND used = FALSE AND expires_at > NOW()',
+    [code, clientId]
+  );
+
+  if (result.affectedRows === 0) {
+    return null;
+  }
 
   const redis = getRedisClient();
   await redis.del(`auth_code:${code}`);
