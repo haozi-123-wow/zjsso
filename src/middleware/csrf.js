@@ -9,7 +9,7 @@ function generateCsrfToken() {
 
 function setCsrfCookie(res, token) {
   const maxAge = 86400; // 24 小时
-  res.setHeader('Set-Cookie', [
+  res.appendHeader('Set-Cookie', [
     `${CSRF_COOKIE_NAME}=${token}`,
     'HttpOnly; Secure; SameSite=None',
     `Path=/api/auth`,
