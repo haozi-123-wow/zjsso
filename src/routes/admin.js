@@ -180,12 +180,13 @@ router.put('/clients/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'forbidden', message: '无权修改此客户端' });
     }
 
+    const sensitiveFields = ['allowed_groups', 'grant_types', 'token_endpoint_auth_method'];
     const allowedFields = [
       'client_name', 'client_description', 'redirect_uris',
       'post_logout_redirect_uris', 'grant_types', 'response_types',
       'token_endpoint_auth_method', 'homepage_uri', 'logo_uri', 'pkce_required',
       'allowed_groups'
-    ];
+    ].filter(field => req.user.role === 'admin' || !sensitiveFields.includes(field));
 
     const updates = [];
     const values = [];
