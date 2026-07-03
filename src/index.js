@@ -6,6 +6,7 @@ const config = require('./config');
 const { getPool, closePool } = require('./database/connection');
 const { closeRedis } = require('./database/redis');
 
+const { getForwardedFor } = require('./services/IpLocationService');
 const authRoutes = require('./routes/auth');
 const emailRoutes = require('./routes/email');
 const geetestRoutes = require('./routes/geetest');
@@ -54,6 +55,18 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 日志中间件：输出完整 X-Forwarded-For 头、req.ip 和请求路径
+app.use((req, res, next) => {
+  const xff = getForwardedFor(req);
+  const logParts = [`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`];
+  logParts.push(`ip=${req.ip}`);
+  if (xff) {
+    logParts.push(`x-forwarded-for=${xff}`);
+  }
+  console.log(logParts.join(' │ '));
+  next();
+});
 
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 

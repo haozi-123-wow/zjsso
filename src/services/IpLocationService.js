@@ -64,4 +64,8 @@ function getClientIp(req) {
   return req.ip || req.connection?.remoteAddress || null;
 }
 
-module.exports = { getIpLocation, getClientIp };
+function getForwardedFor(req) {
+  return req.headers['x-forwarded-for'] || null;
+}
+
+module.exports = { getIpLocation, getClientIp, getForwardedFor };
