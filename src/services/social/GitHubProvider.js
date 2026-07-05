@@ -1,5 +1,6 @@
 const https = require('https');
 const { URL } = require('url');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 const { SocialProvider } = require('./Provider');
 const config = require('../../config');
 const cosAvatarService = require('../CosAvatarService');
@@ -7,6 +8,18 @@ const cosAvatarService = require('../CosAvatarService');
 class GitHubProvider extends SocialProvider {
   constructor() {
     super('github', 'github');
+    this.socksConfig = config.socks5 || {};
+  }
+
+  _createHttpsAgent() {
+    if (this.socksConfig.host) {
+      const proxyUrl = this.socksConfig.username
+        ? `socks5://${this.socksConfig.username}:${this.socksConfig.password}@${this.socksConfig.host}:${this.socksConfig.port}`
+        : `socks5://${this.socksConfig.host}:${this.socksConfig.port}`;
+      console.log(`[GitHub] Using SOCKS5 proxy: ${this.socksConfig.host}:${this.socksConfig.port}`);
+      return new SocksProxyAgent(proxyUrl);
+    }
+    return new https.Agent({ keepAlive: true });
   }
 
   getAuthorizationUrl(state) {
@@ -127,6 +140,7 @@ class GitHubProvider extends SocialProvider {
   _httpsRequest(urlStr, options, data) {
     return new Promise((resolve, reject) => {
       const url = new URL(urlStr);
+      const agent = this._createHttpsAgent();
       console.log(`[GitHub] HTTP ${options.method || 'GET'} ${url.hostname}${url.pathname}${url.search || ''}`);
       const req = https.request({
         hostname: url.hostname,
@@ -134,6 +148,7 @@ class GitHubProvider extends SocialProvider {
         path: url.pathname + (url.search || ''),
         method: options.method || 'GET',
         headers: options.headers || {},
+        agent,
         timeout: 30000
       }, (res) => {
         let body = '';

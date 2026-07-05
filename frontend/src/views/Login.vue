@@ -460,6 +460,16 @@
           </div>
 
           <div class="toast" v-if="toast.show" :class="toast.type">{{ toast.message }}</div>
+
+          <footer class="auth-foot">
+            <div class="auth-foot-divider"></div>
+            <div class="auth-foot-text">
+              继续操作即表示您已阅读并同意
+              <router-link to="/terms" class="foot-link">《服务条款》</router-link>
+              和
+              <router-link to="/privacy" class="foot-link">《隐私政策》</router-link>
+            </div>
+          </footer>
         </div>
       </main>
     </div>
@@ -1344,4 +1354,11 @@ onMounted(async () => {
   .brand-stats { padding: 12px; gap: 12px; }
   .stat-value { font-size: 15px; }
 }
+
+/* 底部合规链接 */
+.auth-foot { margin-top: 24px; padding-top: 18px; }
+.auth-foot-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-subtle), transparent); margin-bottom: 14px; }
+.auth-foot-text { text-align: center; font-size: 11.5px; color: var(--text-faint); line-height: 1.8; letter-spacing: 0.2px; }
+.foot-link { color: var(--text-muted); text-decoration: none; padding: 0 2px; transition: color 0.25s ease; border-bottom: 1px solid transparent; }
+.foot-link:hover { color: var(--primary); border-bottom-color: rgba(230, 57, 70, 0.4); }
 </style>
