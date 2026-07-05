@@ -1227,8 +1227,8 @@ function base64URLToBuffer(base64url: string) {
 
 /* ============ 角色行 ============ */
 .role-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-.2fa-badge { display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.12)); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.4); box-shadow: 0 2px 8px rgba(16,185,129,0.1); }
-.2fa-badge svg { flex-shrink: 0; }
+.twofa-badge { display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.12)); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.4); box-shadow: 0 2px 8px rgba(16,185,129,0.1); }
+.twofa-badge svg { flex-shrink: 0; }
 
 /* ============ 资料完整性 ============ */
 .profile-meta { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; margin-bottom: 4px; }
