@@ -64,6 +64,12 @@ module.exports = {
     rpName: process.env.WEBAUTHN_RP_NAME || 'ZJSSO System',
     allowedOrigins: (process.env.WEBAUTHN_ALLOWED_ORIGINS || 'http://localhost,http://localhost:5173,http://localhost:5174,http://localhost:4173').split(',')
   },
+  socks5: {
+    host: process.env.SOCKS5_PROXY_HOST || '',
+    port: parseInt(process.env.SOCKS5_PROXY_PORT) || 1080,
+    username: process.env.SOCKS5_PROXY_USERNAME || '',
+    password: process.env.SOCKS5_PROXY_PASSWORD || ''
+  },
   social: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',
@@ -74,6 +80,11 @@ module.exports = {
       appId: process.env.QQ_APP_ID || '',
       appKey: process.env.QQ_APP_KEY || '',
       callbackUrl: process.env.QQ_CALLBACK_URL || 'http://localhost:3000/api/auth/social/qq/callback'
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:6873/api/auth/social/google/callback'
     }
   },
   cos: {

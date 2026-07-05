@@ -50,6 +50,13 @@
             {{ redirecting ? '跳转中...' : '授权' }}
           </button>
         </div>
+
+        <div class="consent-foot">
+          授权即表示您同意 ZJSSO 的
+          <router-link to="/terms" class="foot-link">《服务条款》</router-link>
+          与
+          <router-link to="/privacy" class="foot-link">《隐私政策》</router-link>
+        </div>
       </div>
     </div>
 
@@ -237,4 +244,8 @@ function deny() {
 .btn-approve-icon { width: 18px; height: 18px; }
 .btn-cancel { flex: 1; padding: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; color: #6B7280; font-size: 15px; font-weight: 500; cursor: pointer; transition: all 0.4s ease; font-family: inherit; }
 .btn-cancel:hover:not(:disabled) { color: #9CA3AF; border-color: rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.02); }
+
+.consent-foot { margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, 0.05); font-size: 11.5px; color: #4B5058; text-align: center; line-height: 1.8; letter-spacing: 0.2px; }
+.foot-link { color: #6B7280; text-decoration: none; padding: 0 2px; border-bottom: 1px solid transparent; transition: all 0.25s ease; }
+.foot-link:hover { color: #E63946; border-bottom-color: rgba(230, 57, 70, 0.4); }
 </style>

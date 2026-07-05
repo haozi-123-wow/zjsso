@@ -61,7 +61,18 @@ function formatLocation(data) {
 }
 
 function getClientIp(req) {
+  // 优先取 X-Forwarded-For 最左侧的客户端真实 IP
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) {
+    const ips = xff.split(',').map(s => s.trim()).filter(Boolean);
+    if (ips.length > 0) return ips[0];
+  }
+  // 兜底：直连 IP
   return req.ip || req.connection?.remoteAddress || null;
 }
 
-module.exports = { getIpLocation, getClientIp };
+function getForwardedFor(req) {
+  return req.headers['x-forwarded-for'] || null;
+}
+
+module.exports = { getIpLocation, getClientIp, getForwardedFor };

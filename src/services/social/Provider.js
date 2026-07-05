@@ -105,6 +105,17 @@ function getAllProviders() {
     });
   }
 
+  const googleConfig = config.social.google;
+  if (googleConfig.clientId) {
+    enabledProviders.push({
+      provider: 'google',
+      name: 'Google',
+      icon: 'google',
+      authorization_url: '/api/auth/social/google/login',
+      enabled: true
+    });
+  }
+
   return enabledProviders;
 }
 

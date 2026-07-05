@@ -162,6 +162,7 @@
 
           <div class="auth-footer">
             <p>还没有账号？<a href="/register" class="auth-link">立即注册</a></p>
+            <p class="legal-hint">继续即表示您已阅读并同意 <a href="/#/terms" class="auth-link">《服务条款》</a> 与 <a href="/#/privacy" class="auth-link">《隐私政策》</a></p>
           </div>
         </div>
       </div>
@@ -728,6 +729,8 @@ main { flex: 1; }
 .auth-footer p { font-size: 14px; color: #6B7280; margin: 0; }
 .auth-link { color: #E63946; text-decoration: none; margin-left: 4px; }
 .auth-link:hover { text-decoration: underline; }
+.legal-hint { margin-top: 10px !important; font-size: 12px !important; color: #4B5058 !important; line-height: 1.7; }
+.legal-hint .auth-link { margin-left: 0; }
 
 /* ========== Footer ========== */
 .footer { background: #070707; border-top: 1px solid rgba(230, 57, 70, 0.06); padding: 72px 0 32px; position: relative; overflow: hidden; }
