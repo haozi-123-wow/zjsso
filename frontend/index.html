@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZJSSO - 耗子单点登录系统</title>
+    <title>zjsso - 耗子单点登录系统</title>
+    <meta name="description" content="zjsso - 耗子单点登录系统，为您提供安全的统一身份认证服务。">
+    <meta name="keywords" content="zjsso,耗子单点登录,统一身份认证,SSO,单点登录">
     <script src="https://static.geetest.com/v4/gt4.js"></script>
     <script type="module">
       if (import.meta.hot?.on) {
@@ -20,6 +22,12 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- 硬编码在源码中，确保 Google 审核爬虫能直接扫到 -->
+    <div style="position: fixed; bottom: 16px; left: 0; right: 0; text-align: center; z-index: 9999; pointer-events: none;">
+      <a href="https://login.haoziwan.cn/#/privacy" target="_blank" style="pointer-events: auto; color: #999; text-decoration: none; font-size: 13px;">隐私权政策</a>
+      <span style="color: #555; margin: 0 8px; font-size: 13px;">|</span>
+      <a href="https://login.haoziwan.cn/#/terms" target="_blank" style="pointer-events: auto; color: #999; text-decoration: none; font-size: 13px;">服务条款</a>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
