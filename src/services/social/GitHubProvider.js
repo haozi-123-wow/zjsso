@@ -14,8 +14,8 @@ class GitHubProvider extends SocialProvider {
   _createHttpsAgent() {
     if (this.socksConfig.host) {
       const proxyUrl = this.socksConfig.username
-        ? `socks5://${this.socksConfig.username}:${this.socksConfig.password}@${this.socksConfig.host}:${this.socksConfig.port}`
-        : `socks5://${this.socksConfig.host}:${this.socksConfig.port}`;
+        ? `socks5h://${this.socksConfig.username}:${this.socksConfig.password}@${this.socksConfig.host}:${this.socksConfig.port}`
+        : `socks5h://${this.socksConfig.host}:${this.socksConfig.port}`;
       console.log(`[GitHub] Using SOCKS5 proxy: ${this.socksConfig.host}:${this.socksConfig.port}`);
       return new SocksProxyAgent(proxyUrl);
     }
