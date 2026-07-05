@@ -269,7 +269,7 @@
               <div v-if="socialConnections.length === 0" class="empty-state"><p>尚未绑定社交账号</p></div>
               <div v-else class="social-list">
                 <div v-for="conn in socialConnections" :key="conn.id" class="social-item">
-                  <span class="social-provider">{{ conn.provider === 'github' ? 'GitHub' : conn.provider === 'qq' ? 'QQ' : conn.provider }}</span>
+                  <span class="social-provider">{{ conn.provider === 'github' ? 'GitHub' : conn.provider === 'google' ? 'Google' : conn.provider }}</span>
                   <span class="social-username">{{ conn.provider_username }}</span>
                   <button class="cred-delete" @click="unbindSocial(conn.id)">解绑</button>
                 </div>
@@ -278,8 +278,8 @@
                 <button v-if="!socialConnections.find(c => c.provider === 'github')" class="btn-register-key" :disabled="bindLoading === 'github'" @click="bindSocial('github')">
                   {{ bindLoading === 'github' ? '绑定中...' : '绑定 GitHub' }}
                 </button>
-                <button v-if="!socialConnections.find(c => c.provider === 'qq')" class="btn-register-key" :disabled="bindLoading === 'qq'" @click="bindSocial('qq')">
-                  {{ bindLoading === 'qq' ? '绑定中...' : '绑定 QQ' }}
+                <button v-if="!socialConnections.find(c => c.provider === 'google')" class="btn-register-key" :disabled="bindLoading === 'google'" @click="bindSocial('google')">
+                  {{ bindLoading === 'google' ? '绑定中...' : '绑定 Google' }}
                 </button>
               </div>
             </div>
@@ -591,7 +591,7 @@ function activityDetail(act: any) {
       return ''
     }
     if (act.action === 'bind_social' || act.action === 'unbind_social') {
-      const provider = d.provider === 'github' ? 'GitHub' : d.provider === 'qq' ? 'QQ' : d.provider
+      const provider = d.provider === 'github' ? 'GitHub' : d.provider === 'google' ? 'Google' : d.provider
       return d.username ? `${provider} (${d.username})` : provider
     }
     if (act.action === 'revoke_consent') {

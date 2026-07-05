@@ -1,0 +1,29 @@
+# 检查清单
+
+- [x] SOCKS5 代理配置已添加到 `config/index.js` 和 `.env.example`
+  - [x] `SOCKS5_PROXY_HOST`、`SOCKS5_PROXY_PORT`、`SOCKS5_PROXY_USERNAME`、`SOCKS5_PROXY_PASSWORD` 四个变量
+  - [x] 代理未配置时 GoogleProvider 可回退到直接 HTTPS 请求
+- [x] Google OAuth 配置已添加到 `config/index.js` 和 `.env.example`
+  - [x] `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_CALLBACK_URL` 三个变量
+- [x] `socks-proxy-agent` 依赖已安装到 `package.json`
+- [x] GoogleProvider 后端服务代码实现符合规范
+  - [x] 继承 `SocialProvider` 基类
+  - [x] `getAuthorizationUrl` 使用正确的 Google OAuth 端点（`https://accounts.google.com/o/oauth2/v2/auth`）
+  - [x] `getAccessToken` 使用 `client_id` + `client_secret` + code 交换 token
+  - [x] `getUserProfile` 从 `https://www.googleapis.com/oauth2/v3/userinfo` 获取邮箱、头像等信息
+  - [x] HTTP 请求使用 SOCKS5 代理（如已配置）
+  - [x] 返回的用户资料中包含 `email`（非 null）和 `picture`
+  - [x] 回调 URL 格式符合项目规范
+- [x] GoogleProvider 已注册到 `social.js` 的 provider map 中
+- [x] `getProvider('google')` 能正确返回 GoogleProvider 实例
+- [x] `getAllProviders()` 在配置了 `GOOGLE_CLIENT_ID` 时返回 Google 条目
+- [x] 前端登录页显示 Google 按钮（非 QQ 按钮）
+- [x] 前端登录页点击 Google 按钮跳转到 `/api/auth/social/google/login`
+- [x] 前端个人中心社交绑定显示"绑定 Google"（非"绑定 QQ"）
+- [x] QQ 后端逻辑完整保留，未删除任何 QQ 相关文件或代码
+- [x] 绑定 Google 时的头像处理逻辑正确
+  - [x] 用户已有头像时，`users.picture` 不被覆盖
+  - [x] 用户无头像时，`users.picture` 被更新为 Google 头像 URL
+- [x] 绑定 Google 时的邮箱处理逻辑正确
+  - [x] 用户已有邮箱时，`users.email` 不被覆盖
+  - [x] 用户无邮箱时，`users.email` 被更新为 Google 邮箱，`email_verified` 设为 `true`

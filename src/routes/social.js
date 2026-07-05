@@ -5,6 +5,7 @@ const db = require('../database/connection');
 const User = require('../models/User');
 const githubProvider = require('../services/social/GitHubProvider');
 const qqProvider = require('../services/social/QQProvider');
+const googleProvider = require('../services/social/GoogleProvider');
 const { storeOAuthState, getAllProviders } = require('../services/social/Provider');
 const { authenticate } = require('../middleware/auth');
 const { log, ACTION } = require('../services/ActivityLogService');
@@ -16,7 +17,7 @@ const { setRefreshTokenCookie } = require('../utils/cookie');
 const router = express.Router();
 
 function getProvider(providerName) {
-  const map = { github: githubProvider, qq: qqProvider };
+  const map = { github: githubProvider, qq: qqProvider, google: googleProvider };
   return map[providerName] || null;
 }
 
@@ -113,6 +114,39 @@ router.get('/social/:provider/callback', async (req, res) => {
          socialData.access_token, socialData.refresh_token]
       );
 
+      // 如果是 Google 绑定，条件性更新用户的头像和邮箱
+      if (socialData.provider === 'google') {
+        const userRows = await db.query(
+          'SELECT picture, email FROM users WHERE id = ?',
+          [socialData.bind_user_id]
+        );
+        if (userRows.length > 0) {
+          const userRecord = userRows[0];
+          const userUpdates = [];
+          const userUpdateValues = [];
+
+          if (!userRecord.picture && socialData.provider_avatar) {
+            userUpdates.push('picture = ?');
+            userUpdateValues.push(socialData.provider_avatar);
+          }
+
+          if (!userRecord.email && socialData.provider_email) {
+            userUpdates.push('email = ?');
+            userUpdateValues.push(socialData.provider_email);
+            userUpdates.push('email_verified = ?');
+            userUpdateValues.push(true);
+          }
+
+          if (userUpdates.length > 0) {
+            userUpdateValues.push(socialData.bind_user_id);
+            await db.query(
+              `UPDATE users SET ${userUpdates.join(', ')} WHERE id = ?`,
+              userUpdateValues
+            );
+          }
+        }
+      }
+
       log(socialData.bind_user_id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
       console.log(`[Social] ${req.params.provider} bound to user ${socialData.bind_user_id}`);
       const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
@@ -126,6 +160,42 @@ router.get('/social/:provider/callback', async (req, res) => {
     if (!user) {
       console.error(`[Social] Failed to find or create user for ${req.params.provider}`);
       return res.status(500).json({ error: 'server_error', message: '用户创建失败' });
+    }
+
+    // 登录时，如果社交提供商返回了更好的数据，更新已有用户的邮箱和头像
+    // 仅当用户当前邮箱为空或为占位邮箱（@social.local）时更新
+    const needsEmailUpdate = socialData.provider_email &&
+      (!user.email || user.email.endsWith('@social.local'));
+    const needsPictureUpdate = socialData.provider_avatar && !user.picture;
+
+    if (needsEmailUpdate || needsPictureUpdate) {
+      const userUpdates = [];
+      const userUpdateValues = [];
+
+      if (needsEmailUpdate) {
+        userUpdates.push('email = ?');
+        userUpdateValues.push(socialData.provider_email);
+        userUpdates.push('email_verified = ?');
+        userUpdateValues.push(socialData.provider_email_verified ? 1 : 0);
+        console.log(`[Social] Updating user ${user.id} email from "${user.email}" to "${socialData.provider_email}"`);
+      }
+
+      if (needsPictureUpdate) {
+        userUpdates.push('picture = ?');
+        userUpdateValues.push(socialData.provider_avatar);
+        console.log(`[Social] Updating user ${user.id} picture from "${user.picture}" to "${socialData.provider_avatar}"`);
+      }
+
+      if (userUpdates.length > 0) {
+        userUpdateValues.push(user.id);
+        await db.query(
+          `UPDATE users SET ${userUpdates.join(', ')} WHERE id = ?`,
+          userUpdateValues
+        );
+        // 重新读取最新用户数据
+        user.email = needsEmailUpdate ? socialData.provider_email : user.email;
+        user.picture = needsPictureUpdate ? socialData.provider_avatar : user.picture;
+      }
     }
 
     log(user.id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
