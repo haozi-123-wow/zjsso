@@ -69,6 +69,48 @@ class CosAvatarService {
     }
   }
 
+  /**
+   * 从 GitHub 下载头像并缓存到 COS
+   * @param {string} githubAvatarUrl - GitHub 头像 URL
+   * @param {string} providerUserId - GitHub 用户 ID
+   * @returns {Promise<string>} COS 头像 URL，失败时返回原 GitHub URL
+   */
+  async uploadGithubAvatar(githubAvatarUrl, providerUserId) {
+    if (!this.cosConfig.secretId || !githubAvatarUrl) {
+      return githubAvatarUrl;
+    }
+
+    try {
+      console.log(`[CosAvatar] Downloading GitHub avatar for user ${providerUserId}...`);
+      const imageBuffer = await this._downloadImage(githubAvatarUrl);
+
+      const key = `avatars/github/${providerUserId}.jpg`;
+      const cosClient = new COS({
+        SecretId: this.cosConfig.secretId,
+        SecretKey: this.cosConfig.secretKey
+      });
+
+      console.log(`[CosAvatar] Uploading to COS: ${key} (${(imageBuffer.length / 1024).toFixed(1)}KB)...`);
+      await cosClient.putObject({
+        Bucket: this.cosConfig.bucket,
+        Region: this.cosConfig.region,
+        Key: key,
+        Body: imageBuffer,
+        Headers: {
+          'Cache-Control': 'public, max-age=31536000',
+          'Content-Type': 'image/jpeg'
+        }
+      });
+
+      const cosUrl = this.getCosUrl(key);
+      console.log(`[CosAvatar] GitHub avatar cached to COS: ${cosUrl}`);
+      return cosUrl;
+    } catch (err) {
+      console.error(`[CosAvatar] Failed to cache GitHub avatar: ${err.message}`);
+      return githubAvatarUrl;
+    }
+  }
+
   _downloadImage(url) {
     return new Promise((resolve, reject) => {
       const parsedUrl = new URL(url);

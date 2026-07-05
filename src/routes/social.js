@@ -71,11 +71,33 @@ router.get('/social/:provider/bind', authenticate, async (req, res) => {
 });
 
 router.get('/social/:provider/callback', async (req, res) => {
+  const frontendBase = config.app.frontendUrl || config.app.issuer || 'http://localhost:6873';
+
+  // Google 等 OAuth 提供商在用户拒绝授权时会返回 error 参数
+  if (req.query.error) {
+    console.error(`[Social] ${req.params.provider} callback received error: ${req.query.error}`);
+    // 尝试从 state 中获取 bind_user_id 来判断是绑定还是登录
+    try {
+      const redis = getRedisClient();
+      const stateData = await redis.get(`oauth:${req.params.provider}:${req.query.state}`);
+      if (stateData) {
+        const { bind_user_id } = JSON.parse(stateData);
+        await redis.del(`oauth:${req.params.provider}:${req.query.state}`);
+        if (bind_user_id) {
+          return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent('用户取消了授权')}#/profile`);
+        }
+      }
+    } catch (e) {
+      console.error('[Social] Error reading state on OAuth error:', e.message);
+    }
+    return res.redirect(`${frontendBase}/?login_error=${encodeURIComponent('第三方登录失败：' + req.query.error)}#/login`);
+  }
+
   try {
     const provider = getProvider(req.params.provider);
     if (!provider) {
       console.log(`[Social] Callback for unknown provider: ${req.params.provider}`);
-      return res.status(400).json({ error: 'unsupported_provider', message: '不支持的登录方式' });
+      return res.redirect(`${frontendBase}/?login_error=${encodeURIComponent('不支持的登录方式')}#/login`);
     }
 
     const { code, state } = req.query;
@@ -83,7 +105,7 @@ router.get('/social/:provider/callback', async (req, res) => {
 
     if (!code || !state) {
       console.error(`[Social] Missing required params: code=${!!code}, state=${!!state}`);
-      return res.status(400).json({ error: 'invalid_request', message: '缺少必要参数' });
+      return res.redirect(`${frontendBase}/?login_error=${encodeURIComponent('缺少必要参数')}#/login`);
     }
 
     const socialData = await provider.handleCallback(code, state);
@@ -96,13 +118,12 @@ router.get('/social/:provider/callback', async (req, res) => {
       );
       if (existingConn.length > 0 && existingConn[0].user_id !== socialData.bind_user_id) {
         console.error(`[Social] Conflict: ${req.params.provider} account already bound to user ${existingConn[0].user_id}`);
-        const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
-        return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent(`该${req.params.provider === 'github' ? 'GitHub' : 'QQ'}账号已被其他用户绑定，请先解绑后再操作`)}#/profile`);
+        const providerLabel = socialData.provider === 'github' ? 'GitHub' : socialData.provider === 'google' ? 'Google' : socialData.provider === 'qq' ? 'QQ' : socialData.provider;
+        return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent(`该${providerLabel}账号已被其他用户绑定，请先解绑后再操作`)}#/profile`);
       }
 
       if (existingConn.length > 0 && existingConn[0].user_id === socialData.bind_user_id) {
         console.log(`[Social] ${req.params.provider} already bound to this user`);
-        const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
         return res.redirect(`${frontendBase}/?bind_error=该账号已绑定#/profile`);
       }
 
@@ -114,8 +135,8 @@ router.get('/social/:provider/callback', async (req, res) => {
          socialData.access_token, socialData.refresh_token]
       );
 
-      // 如果是 Google 绑定，条件性更新用户的头像和邮箱
-      if (socialData.provider === 'google') {
+      // 绑定成功后条件性更新用户的头像和邮箱（仅当用户尚未设置时）
+      if (['google', 'github'].includes(socialData.provider)) {
         const userRows = await db.query(
           'SELECT picture, email FROM users WHERE id = ?',
           [socialData.bind_user_id]
@@ -149,8 +170,37 @@ router.get('/social/:provider/callback', async (req, res) => {
 
       log(socialData.bind_user_id, ACTION.BIND_SOCIAL, { provider: socialData.provider, username: socialData.provider_username }, req);
       console.log(`[Social] ${req.params.provider} bound to user ${socialData.bind_user_id}`);
-      const frontendBase = config.app.frontendUrl || 'http://localhost:6873';
-      return res.redirect(`${frontendBase}/?bind_success=1#/profile`);
+
+      // 绑定成功后生成兑换码，让前端通过 #/callback 恢复会话（不依赖 cookie）
+      const bindUserRows = await db.query('SELECT * FROM users WHERE id = ?', [socialData.bind_user_id]);
+      if (bindUserRows.length === 0) {
+        return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent('用户不存在')}#/login`);
+      }
+      const bindUser = bindUserRows[0];
+      const bindTokens = await generateTokens(bindUser);
+      const bindExchangeCode = crypto.randomBytes(16).toString('hex');
+      const bindRedis = getRedisClient();
+      await bindRedis.set(
+        `social:code:${bindExchangeCode}`,
+        JSON.stringify({
+          accessToken: bindTokens.accessToken,
+          refreshToken: bindTokens.refreshToken,
+          idToken: bindTokens.idToken,
+          expiresIn: config.jwt.expiresIn,
+          user: {
+            id: bindUser.id,
+            username: bindUser.username,
+            email: bindUser.email,
+            display_name: bindUser.display_name,
+            picture: bindUser.picture,
+            role: bindUser.role || 'user'
+          }
+        }),
+        'PX',
+        60000
+      );
+
+      return res.redirect(`${frontendBase}/?bind_success=1&code=${bindExchangeCode}#/callback`);
     }
 
     console.log(`[Social] Looking up or creating user for ${req.params.provider} account...`);
@@ -159,7 +209,7 @@ router.get('/social/:provider/callback', async (req, res) => {
 
     if (!user) {
       console.error(`[Social] Failed to find or create user for ${req.params.provider}`);
-      return res.status(500).json({ error: 'server_error', message: '用户创建失败' });
+      return res.redirect(`${frontendBase}/?login_error=${encodeURIComponent('用户创建失败')}#/login`);
     }
 
     // 登录时，如果社交提供商返回了更好的数据，更新已有用户的邮箱和头像
@@ -203,7 +253,6 @@ router.get('/social/:provider/callback', async (req, res) => {
     const tokens = await generateTokens(user);
     console.log(`[Social] Tokens generated for user ${user.username}`);
 
-    const frontendBase = config.app.frontendUrl || config.app.issuer || 'http://localhost:6873';
     const userData = {
       id: user.id,
       username: user.username,
@@ -233,7 +282,10 @@ router.get('/social/:provider/callback', async (req, res) => {
     res.redirect(redirectUrl);
   } catch (err) {
     console.error(`[Social] ${req.params.provider} callback error:`, err.message);
-    res.status(401).json({ error: 'social_login_failed', message: err.message || '第三方登录失败' });
+    // 判断是绑定还是登录流程，重定向到对应页面
+    // 由于 state 可能在 handleCallback 中被清理，无法可靠判断，
+    // 统一重定向到前端，由前端根据用户登录状态自行处理
+    res.redirect(`${frontendBase}/?login_error=${encodeURIComponent(err.message || '第三方登录失败')}#/login`);
   }
 });
 

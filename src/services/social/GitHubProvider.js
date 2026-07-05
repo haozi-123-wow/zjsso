@@ -2,6 +2,7 @@ const https = require('https');
 const { URL } = require('url');
 const { SocialProvider } = require('./Provider');
 const config = require('../../config');
+const cosAvatarService = require('../CosAvatarService');
 
 class GitHubProvider extends SocialProvider {
   constructor() {
@@ -47,7 +48,7 @@ class GitHubProvider extends SocialProvider {
   }
 
   async getUserProfile(accessToken) {
-    console.log(`[GitHub] Fetching user profile...`);
+    console.log(`[GitHub] Fetching user profile from GitHub API...`);
     const profileStart = Date.now();
     const userData = await this._httpsRequest('https://api.github.com/user', {
       headers: {
@@ -56,7 +57,13 @@ class GitHubProvider extends SocialProvider {
         'User-Agent': 'ZJSSO/1.0'
       }
     });
-    console.log(`[GitHub] User profile received in ${Date.now() - profileStart}ms, id=${userData.id}, login=${userData.login}`);
+    console.log(`[GitHub] User profile received in ${Date.now() - profileStart}ms`);
+
+    console.log(`[GitHub] userinfo raw response type:`, typeof userData);
+    if (typeof userData === 'object') {
+      console.log(`[GitHub] userinfo keys:`, Object.keys(userData));
+      console.log(`[GitHub] id: ${userData.id}, login: ${userData.login}, name: ${userData.name || '(null)'}, email: ${userData.email || '(null in public profile)'}, avatar_url: ${userData.avatar_url ? 'yes' : 'no'}`);
+    }
 
     // 始终通过 /user/emails 获取已验证的邮箱，不直接信任公开资料中的 email
     let email = null;
@@ -79,16 +86,33 @@ class GitHubProvider extends SocialProvider {
       if (primaryVerified) {
         email = primaryVerified.email;
         emailVerified = true;
+        console.log(`[GitHub] Using primary verified email: ${email}`);
       } else {
         // 其次使用任意已验证的邮箱
         const anyVerified = emails.find(e => e.verified);
         if (anyVerified) {
           email = anyVerified.email;
           emailVerified = true;
+          console.log(`[GitHub] Using verified email (non-primary): ${email}`);
         }
       }
     }
     console.log(`[GitHub] Verified email: ${email || 'none'}`);
+
+    if (!email) {
+      console.warn(`[GitHub] WARNING: No verified email found for user ${userData.login}. The GitHub account may have no public email or verified email.`);
+    }
+
+    // 将 GitHub 头像缓存到 COS（如果 COS 已配置），替换为可国内访问的 URL
+    let picture = userData.avatar_url || null;
+    if (picture) {
+      console.log(`[GitHub] Avatar source: ${picture}`);
+      const cosUrl = await cosAvatarService.uploadGithubAvatar(picture, String(userData.id));
+      if (cosUrl !== picture) {
+        console.log(`[GitHub] Avatar cached to COS: ${cosUrl}`);
+        picture = cosUrl;
+      }
+    }
 
     return {
       id: String(userData.id),
@@ -96,7 +120,7 @@ class GitHubProvider extends SocialProvider {
       display_name: userData.name || userData.login,
       email: email,
       email_verified: emailVerified,
-      avatar: userData.avatar_url
+      avatar: picture
     };
   }
 

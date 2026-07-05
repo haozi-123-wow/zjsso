@@ -1021,6 +1021,19 @@ function base64URLToBuffer(base64url: string) {
 }
 
 onMounted(async () => {
+  // 处理社交媒体登录/绑定错误回传
+  const loginError = new URLSearchParams(window.location.search).get('login_error')
+  if (loginError) {
+    showToast(decodeURIComponent(loginError))
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+  }
+
+  const bindSuccess = new URLSearchParams(window.location.search).get('bind_success')
+  if (bindSuccess) {
+    showToast('社交账号绑定成功', 'success')
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+  }
+
   if (getAccessToken()) {
     const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
     const redirect = params.get('redirect') || '#/profile'

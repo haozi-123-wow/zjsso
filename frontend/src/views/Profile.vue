@@ -492,12 +492,17 @@ onMounted(async () => {
   if (auth.isLoggedIn) {
     const bindSuccess = new URLSearchParams(window.location.search).get('bind_success')
     const bindError = new URLSearchParams(window.location.search).get('bind_error')
+    const loginError = new URLSearchParams(window.location.search).get('login_error')
     if (bindSuccess) {
       alert('社交账号绑定成功')
       window.history.replaceState({}, '', window.location.pathname + window.location.hash)
     }
     if (bindError) {
       alert(decodeURIComponent(bindError))
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+    }
+    if (loginError) {
+      alert(decodeURIComponent(loginError))
       window.history.replaceState({}, '', window.location.pathname + window.location.hash)
     }
     try {
@@ -1116,7 +1121,7 @@ async function bindSocial(provider: string) {
     })
     const data = await res.json()
     if (data.redirect_url) {
-      window.open(data.redirect_url, '_blank')
+      window.location.href = data.redirect_url
     }
   } catch { }
   finally { bindLoading.value = '' }

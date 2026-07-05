@@ -68,6 +68,14 @@ onMounted(async () => {
         auth.user = data.user
         localStorage.setItem('user', JSON.stringify(data.user))
       }
+      // 清理 URL 中的 code 参数，保留其他参数（如 bind_success）
+      const params = new URLSearchParams(window.location.search)
+      params.delete('code')
+      const queryStr = params.toString()
+      window.history.replaceState(
+        {}, '',
+        `${window.location.pathname}${queryStr ? '?' + queryStr : ''}`
+      )
       window.location.hash = '#/profile'
       return
     } catch {
