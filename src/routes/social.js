@@ -5,6 +5,7 @@ const db = require('../database/connection');
 const User = require('../models/User');
 const githubProvider = require('../services/social/GitHubProvider');
 const qqProvider = require('../services/social/QQProvider');
+const qqAggProvider = require('../services/social/QQAggregatedProvider');
 const googleProvider = require('../services/social/GoogleProvider');
 const { storeOAuthState, getAllProviders } = require('../services/social/Provider');
 const { authenticate } = require('../middleware/auth');
@@ -17,7 +18,12 @@ const { setRefreshTokenCookie } = require('../utils/cookie');
 const router = express.Router();
 
 function getProvider(providerName) {
-  const map = { github: githubProvider, qq: qqProvider, google: googleProvider };
+  if (providerName === 'qq') {
+    if (qqProvider.isEnabled()) return qqProvider;
+    if (qqAggProvider.isEnabled()) return qqAggProvider;
+    return null;
+  }
+  const map = { github: githubProvider, google: googleProvider };
   return map[providerName] || null;
 }
 
@@ -61,7 +67,7 @@ router.get('/social/:provider/bind', authenticate, async (req, res) => {
 
     await storeOAuthState(provider.name, state, redirectUri, req.user.id);
 
-    const authUrl = provider.getAuthorizationUrl(state);
+    const authUrl = await provider.getAuthorizationUrl(state);
     console.log(`[Social] Redirecting to ${req.params.provider} for binding`);
     res.json({ redirect_url: authUrl });
   } catch (err) {
@@ -118,7 +124,7 @@ router.get('/social/:provider/callback', async (req, res) => {
       );
       if (existingConn.length > 0 && existingConn[0].user_id !== socialData.bind_user_id) {
         console.error(`[Social] Conflict: ${req.params.provider} account already bound to user ${existingConn[0].user_id}`);
-        const providerLabel = socialData.provider === 'github' ? 'GitHub' : socialData.provider === 'google' ? 'Google' : socialData.provider === 'qq' ? 'QQ' : socialData.provider;
+        const providerLabel = socialData.provider === 'github' ? 'GitHub' : socialData.provider === 'google' ? 'Google' : socialData.provider === 'qq' || socialData.provider === 'qq_agg' ? 'QQ' : socialData.provider;
         return res.redirect(`${frontendBase}/?bind_error=${encodeURIComponent(`该${providerLabel}账号已被其他用户绑定，请先解绑后再操作`)}#/profile`);
       }
 

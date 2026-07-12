@@ -281,6 +281,9 @@
                 <button v-if="!socialConnections.find(c => c.provider === 'google')" class="btn-register-key" :disabled="bindLoading === 'google'" @click="bindSocial('google')">
                   {{ bindLoading === 'google' ? '绑定中...' : '绑定 Google' }}
                 </button>
+                <button v-if="!socialConnections.find(c => c.provider === 'qq' || c.provider === 'qq_agg')" class="btn-register-key" :disabled="bindLoading === 'qq'" @click="bindSocial('qq')">
+                  {{ bindLoading === 'qq' ? '绑定中...' : '绑定 QQ' }}
+                </button>
               </div>
             </div>
           </div>

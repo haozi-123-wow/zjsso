@@ -81,6 +81,12 @@ module.exports = {
       appKey: process.env.QQ_APP_KEY || '',
       callbackUrl: process.env.QQ_CALLBACK_URL || 'http://localhost:3000/api/auth/social/qq/callback'
     },
+    qq_agg: {
+      baseUrl: process.env.QQ_AGG_BASE_URL || '',
+      appId: process.env.QQ_AGG_APP_ID || '',
+      appKey: process.env.QQ_AGG_APP_KEY || '',
+      callbackUrl: process.env.QQ_AGG_CALLBACK_URL || process.env.QQ_CALLBACK_URL || 'http://localhost:3000/api/auth/social/qq/callback'
+    },
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
