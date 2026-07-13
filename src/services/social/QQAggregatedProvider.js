@@ -16,12 +16,15 @@ class QQAggregatedProvider extends SocialProvider {
 
   getAuthorizationUrl(state) {
     const cfg = this.providerConfig;
+    // 将 state 附加到 redirect_uri 中，因为聚合平台不会单独返回 state 参数
+    const callbackUrl = new URL(cfg.callbackUrl);
+    callbackUrl.searchParams.set('state', state);
     const params = new URLSearchParams({
       act: 'login',
       appid: cfg.appId,
       appkey: cfg.appKey,
       type: 'qq',
-      redirect_uri: cfg.callbackUrl
+      redirect_uri: callbackUrl.toString()
     });
     const apiUrl = `${cfg.baseUrl}/connect.php?${params}`;
 
