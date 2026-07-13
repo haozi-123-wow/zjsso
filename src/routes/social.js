@@ -45,7 +45,7 @@ router.get('/social/:provider/login', async (req, res) => {
 
     await storeOAuthState(provider.name, state, redirectUri);
 
-    const authUrl = provider.getAuthorizationUrl(state);
+    const authUrl = await provider.getAuthorizationUrl(state);
     console.log(`[Social] Redirecting to ${req.params.provider} authorization page`);
     res.redirect(authUrl);
   } catch (err) {
