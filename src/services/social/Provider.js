@@ -95,7 +95,8 @@ function getAllProviders() {
   }
 
   const qqConfig = config.social.qq;
-  if (qqConfig.appId) {
+  const qqAggConfig = config.social.qq_agg;
+  if (qqConfig.appId || qqAggConfig.appId) {
     enabledProviders.push({
       provider: 'qq',
       name: 'QQ',

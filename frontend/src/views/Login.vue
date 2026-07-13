@@ -162,20 +162,30 @@
                   <button class="link-btn" @click="switchToEmailCode">使用邮箱验证码登录</button>
                 </div>
 
-                <div class="auth-divider"><span>其他方式</span></div>
-
-                <div class="social-grid">
-                  <button type="button" class="btn-social" @click="handleGithubLogin" :disabled="githubLoading">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                    <span>GitHub</span>
-                  </button>
-                  <button type="button" class="btn-social" @click="handleGoogleLogin" :disabled="googleLoading">
-                    <svg viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                    <span>Google</span>
-                  </button>
-                  <button type="button" class="btn-social" @click="handleWebAuthnLogin" :disabled="webauthnLoading">
+                <!-- 通行密钥（推荐快速登录） -->
+                <button type="button" class="btn-passkey" :disabled="webauthnLoading" @click="handleWebAuthnLogin">
+                  <span class="passkey-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                    <span>通行密钥</span>
+                  </span>
+                  <span class="passkey-content">
+                    <span class="passkey-title">使用通行密钥登录</span>
+                    <span class="passkey-desc">Touch ID / Windows Hello · 无需密码</span>
+                  </span>
+                  <span class="passkey-arrow">→</span>
+                </button>
+
+                <div class="auth-divider"><span>或使用社交账号</span></div>
+
+                <!-- 社交账号圆形图标行 -->
+                <div class="social-icons">
+                  <button type="button" class="btn-icon" @click="handleGithubLogin" :disabled="githubLoading" title="GitHub">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                  </button>
+                  <button type="button" class="btn-icon" @click="handleGoogleLogin" :disabled="googleLoading" title="Google">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  </button>
+                  <button type="button" class="btn-icon" @click="handleQqLogin" :disabled="qqLoading" title="QQ">
+                    <img src="/qq.svg" alt="QQ" />
                   </button>
                 </div>
               </div>
@@ -509,6 +519,7 @@ const regLoading = ref(false)
 const resetLoading = ref(false)
 const githubLoading = ref(false)
 const googleLoading = ref(false)
+const qqLoading = ref(false)
 const webauthnLoading = ref(false)
 const securityNotice = ref<any>(null)
 const showPassword = ref(false)
@@ -645,6 +656,7 @@ function onCodeInput(idx: number, e: Event) {
   input.value = val
   emailCodeForm.code = joinCode(codeChars.value)
   if (val && idx < 5) focusCodeInput(idx + 1)
+  if (emailCodeForm.code.length === 6) { loginWithEmailCode() }
 }
 
 function onCodeKeydown(idx: number, e: KeyboardEvent) {
@@ -664,6 +676,7 @@ function onCodePaste(e: ClipboardEvent) {
   for (let i = 0; i < 6; i++) codeChars.value[i] = text[i] || ''
   emailCodeForm.code = joinCode(codeChars.value)
   focusCodeInput(Math.min(text.length, 5))
+  if (emailCodeForm.code.length === 6) { loginWithEmailCode() }
 }
 
 function onTotpInput(idx: number, e: Event) {
@@ -673,6 +686,7 @@ function onTotpInput(idx: number, e: Event) {
   input.value = val
   totpCode.value = joinCode(totpChars.value)
   if (val && idx < 5) focusCodeInput(idx + 1)
+  if (totpCode.value.length === 6) { verifyTotp() }
 }
 
 function onTotpKeydown(idx: number, e: KeyboardEvent) {
@@ -692,6 +706,7 @@ function onTotpPaste(e: ClipboardEvent) {
   for (let i = 0; i < 6; i++) totpChars.value[i] = text[i] || ''
   totpCode.value = joinCode(totpChars.value)
   focusCodeInput(Math.min(text.length, 5))
+  if (totpCode.value.length === 6) { verifyTotp() }
 }
 
 function onResetCodeInput(idx: number, e: Event) {
@@ -701,6 +716,7 @@ function onResetCodeInput(idx: number, e: Event) {
   input.value = val
   resetForm.code = joinCode(resetCodeChars.value)
   if (val && idx < 5) focusResetCodeInput(idx + 1)
+  if (resetForm.code.length === 6 && resetStep.value === 2) { handleResetPassword() }
 }
 
 function onResetCodeKeydown(idx: number, e: KeyboardEvent) {
@@ -719,6 +735,7 @@ function onResetCodePaste(e: ClipboardEvent) {
   if (!text) return
   for (let i = 0; i < 6; i++) resetCodeChars.value[i] = text[i] || ''
   resetForm.code = joinCode(resetCodeChars.value)
+  if (resetForm.code.length === 6 && resetStep.value === 2) { handleResetPassword() }
   focusResetCodeInput(Math.min(text.length, 5))
 }
 
@@ -832,7 +849,7 @@ async function handleRegister() {
     const geetest = await triggerGeetest()
     const data = await auth.register({ ...regForm }, geetest)
     if (data.user_id) {
-      showToast('注册成功！请查收激活邮件完成账户激活。', 'success')
+      showToast('注册成功！请查收激活邮件完成账户激活（如未收到，请检查垃圾邮箱）。', 'success')
       activeTab.value = 'login'
     } else {
       showToast(data.message || '注册失败')
@@ -877,6 +894,12 @@ function handleGoogleLogin() {
   googleLoading.value = true
   const redirect = encodeURIComponent(`${window.location.origin}${window.location.hash ? window.location.hash.replace('#', '') : '/login'}`)
   window.location.href = `${API_BASE}/api/auth/social/google/login?redirect_uri=${redirect}`
+}
+
+function handleQqLogin() {
+  qqLoading.value = true
+  const redirect = encodeURIComponent(`${window.location.origin}${window.location.hash ? window.location.hash.replace('#', '') : '/login'}`)
+  window.location.href = `${API_BASE}/api/auth/social/qq/login?redirect_uri=${redirect}`
 }
 
 async function handleWebAuthnLogin() {
@@ -1293,16 +1316,28 @@ onMounted(async () => {
 .auth-divider::after { right: 0; }
 .auth-divider span { color: var(--text-faint); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; padding: 0 8px; background: rgba(22,24,30,0.96); }
 
-/* 第三方登录网格 */
-.social-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.btn-social { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px 8px; border: 1px solid var(--border-subtle); border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1); position: relative; overflow: hidden; }
-.btn-social::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(230,57,70,0.15), transparent 70%); opacity: 0; transition: opacity 0.3s ease; }
-.btn-social svg { width: 22px; height: 22px; position: relative; z-index: 1; transition: transform 0.3s ease; }
-.btn-social > span { position: relative; z-index: 1; }
-.btn-social:hover:not(:disabled) { background: linear-gradient(180deg, rgba(230,57,70,0.08), rgba(230,57,70,0.03)); border-color: rgba(230,57,70,0.3); color: var(--text-primary); transform: translateY(-3px); box-shadow: 0 8px 20px rgba(230,57,70,0.15); }
-.btn-social:hover:not(:disabled)::before { opacity: 1; }
-.btn-social:hover:not(:disabled) svg { transform: scale(1.1); }
-.btn-social:disabled { opacity: 0.5; cursor: not-allowed; }
+/* ========== 通行密钥（推荐快速登录） ========== */
+.btn-passkey { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border: 1px solid rgba(230, 57, 70, 0.22); border-radius: 12px; background: linear-gradient(135deg, rgba(230, 57, 70, 0.08), rgba(230, 57, 70, 0.03)); color: var(--text-primary); cursor: pointer; font-family: inherit; transition: all var(--transition); text-align: left; }
+.btn-passkey:hover:not(:disabled) { background: linear-gradient(135deg, rgba(230, 57, 70, 0.14), rgba(230, 57, 70, 0.06)); border-color: rgba(230, 57, 70, 0.4); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(230, 57, 70, 0.15); }
+.btn-passkey:active:not(:disabled) { transform: translateY(0); }
+.btn-passkey:disabled { opacity: 0.55; cursor: not-allowed; }
+.passkey-icon { width: 38px; height: 38px; flex-shrink: 0; background: rgba(230, 57, 70, 0.12); border: 1px solid rgba(230, 57, 70, 0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary); transition: all var(--transition); }
+.btn-passkey:hover:not(:disabled) .passkey-icon { background: rgba(230, 57, 70, 0.2); border-color: rgba(230, 57, 70, 0.4); }
+.passkey-icon svg { width: 20px; height: 20px; }
+.passkey-content { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.passkey-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.passkey-desc { font-size: 11.5px; color: var(--text-muted); line-height: 1.3; }
+.passkey-arrow { font-size: 16px; color: var(--primary); font-weight: 500; transition: transform var(--transition); }
+.btn-passkey:hover:not(:disabled) .passkey-arrow { transform: translateX(3px); }
+
+/* ========== 社交账号圆形图标行 ========== */
+.social-icons { display: flex; justify-content: center; gap: 12px; }
+.btn-icon { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-subtle); background: var(--bg-input); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--transition); font-family: inherit; }
+.btn-icon:hover:not(:disabled) { background: var(--bg-input-hover); border-color: var(--border-medium); color: var(--text-primary); transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25); }
+.btn-icon:active:not(:disabled) { transform: translateY(0); }
+.btn-icon svg, .btn-icon img { width: 20px; height: 20px; transition: transform var(--transition); }
+.btn-icon:hover:not(:disabled) svg, .btn-icon:hover:not(:disabled) img { transform: scale(1.08); }
+.btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* TOTP 2FA */
 .totp-verify { text-align: center; padding: 12px 0 8px; }
@@ -1347,9 +1382,7 @@ onMounted(async () => {
   .auth-card { padding: 28px 22px; border-radius: 20px; }
   .card-title { font-size: 22px; }
   .code-box { font-size: 20px; max-width: 44px; }
-  .social-grid { gap: 8px; }
-  .btn-social { padding: 14px 6px; font-size: 11px; }
-  .btn-social svg { width: 20px; height: 20px; }
+  .btn-icon { width: 44px; height: 44px; }
   .brand-headline { font-size: 22px; }
   .brand-stats { padding: 12px; gap: 12px; }
   .stat-value { font-size: 15px; }
